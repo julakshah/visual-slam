@@ -114,8 +114,8 @@ orb_demo.exe: CMakeFiles/orb_demo.dir/src/orb.cpp.obj
 orb_demo.exe: CMakeFiles/orb_demo.dir/build.make
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_features2d.dll.a
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_highgui.dll.a
-orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_flann.dll.a
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_videoio.dll.a
+orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_flann.dll.a
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_imgcodecs.dll.a
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_imgproc.dll.a
 orb_demo.exe: C:/msys64/ucrt64/lib/libopencv_core.dll.a

@@ -6,7 +6,7 @@
 			[
 				{
 					"build" : ".",
-					"jsonFile" : "directory-.-d0094a50bb2071803777.json",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.10"
@@ -19,7 +19,7 @@
 					]
 				}
 			],
-			"name" : "",
+			"name" : "Debug",
 			"projects" : 
 			[
 				{
@@ -39,7 +39,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "orb_demo::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-orb_demo-7d7ccb7495975d43dddc.json",
+					"jsonFile" : "target-orb_demo-Debug-39aad92d20fbe942fbc7.json",
 					"name" : "orb_demo",
 					"projectIndex" : 0
 				}

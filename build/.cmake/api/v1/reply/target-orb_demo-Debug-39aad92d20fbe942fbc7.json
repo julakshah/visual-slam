@@ -35,13 +35,13 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 38,
+				"line" : 39,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 45,
+				"line" : 46,
 				"parent" : 0
 			},
 			{
@@ -71,12 +71,6 @@
 				"parent" : 6
 			},
 			{
-				"command" : 2,
-				"file" : 1,
-				"line" : 274,
-				"parent" : 6
-			},
-			{
 				"command" : 5,
 				"file" : 0,
 				"line" : 11,
@@ -85,13 +79,13 @@
 			{
 				"command" : 6,
 				"file" : 0,
-				"line" : 28,
+				"line" : 29,
 				"parent" : 0
 			},
 			{
 				"command" : 6,
 				"file" : 0,
-				"line" : 32,
+				"line" : 33,
 				"parent" : 0
 			}
 		]
@@ -102,29 +96,29 @@
 			"compileCommandFragments" : 
 			[
 				{
-					"fragment" : "-std=c++17"
+					"fragment" : "-g -std=c++17"
 				},
 				{
-					"backtrace" : 9,
+					"backtrace" : 8,
 					"fragment" : "-Wall"
 				},
 				{
-					"backtrace" : 9,
+					"backtrace" : 8,
 					"fragment" : "-Wextra"
 				},
 				{
-					"backtrace" : 9,
+					"backtrace" : 8,
 					"fragment" : "-Wpedantic"
 				}
 			],
 			"includes" : 
 			[
 				{
-					"backtrace" : 10,
+					"backtrace" : 9,
 					"path" : "C:/Users/choang/College/CompRobo/visual-slam/include"
 				},
 				{
-					"backtrace" : 11,
+					"backtrace" : 10,
 					"isSystem" : true,
 					"path" : "C:/msys64/ucrt64/include/opencv4"
 				}
@@ -151,6 +145,10 @@
 		"commandFragments" : 
 		[
 			{
+				"fragment" : "-g",
+				"role" : "flags"
+			},
+			{
 				"backtrace" : 2,
 				"fragment" : "C:\\msys64\\ucrt64\\lib\\libopencv_features2d.dll.a",
 				"role" : "libraries"
@@ -161,13 +159,13 @@
 				"role" : "libraries"
 			},
 			{
-				"backtrace" : 7,
-				"fragment" : "C:\\msys64\\ucrt64\\lib\\libopencv_flann.dll.a",
+				"backtrace" : 2,
+				"fragment" : "C:\\msys64\\ucrt64\\lib\\libopencv_videoio.dll.a",
 				"role" : "libraries"
 			},
 			{
-				"backtrace" : 8,
-				"fragment" : "C:\\msys64\\ucrt64\\lib\\libopencv_videoio.dll.a",
+				"backtrace" : 7,
+				"fragment" : "C:\\msys64\\ucrt64\\lib\\libopencv_flann.dll.a",
 				"role" : "libraries"
 			},
 			{

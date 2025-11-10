@@ -22,6 +22,7 @@ find_package(OpenCV REQUIRED COMPONENTS
     imgproc      # For cv::drawKeypoints, cvRound
     highgui      # For cv::imshow, cv::waitKey
     imgcodecs    # For cv::imread
+    videoio      # For cv::VideoCapture
 )
 
 # Include your local header files ("include/orb.hpp")
