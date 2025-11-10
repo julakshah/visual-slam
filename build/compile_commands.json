@@ -1,0 +1,14 @@
+[
+{
+  "directory": "C:/Users/choang/College/CompRobo/visual-slam/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles/orb_demo.dir/includes_CXX.rsp -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\orb_demo.dir\\src\\main.cpp.obj -c C:\\Users\\choang\\College\\CompRobo\\visual-slam\\src\\main.cpp",
+  "file": "C:/Users/choang/College/CompRobo/visual-slam/src/main.cpp",
+  "output": "CMakeFiles/orb_demo.dir/src/main.cpp.obj"
+},
+{
+  "directory": "C:/Users/choang/College/CompRobo/visual-slam/build",
+  "command": "C:\\msys64\\ucrt64\\bin\\g++.exe  @CMakeFiles/orb_demo.dir/includes_CXX.rsp -g -std=c++17 -Wall -Wextra -Wpedantic -o CMakeFiles\\orb_demo.dir\\src\\orb.cpp.obj -c C:\\Users\\choang\\College\\CompRobo\\visual-slam\\src\\orb.cpp",
+  "file": "C:/Users/choang/College/CompRobo/visual-slam/src/orb.cpp",
+  "output": "CMakeFiles/orb_demo.dir/src/orb.cpp.obj"
+}
+]

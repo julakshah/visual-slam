@@ -2,6 +2,8 @@
 #define ORB_HPP
 
 #include <opencv2/core.hpp>
+#include <vector>
+#include <opencv2/features2d.hpp>
 
 class ORBDescriptor
 {
@@ -19,7 +21,8 @@ public:
 
 private:
     // Helper for computing raw moments in a patch
-    void computePatchMoments(const cv::Mat& patch, double& m00, double& m10, double& m01);
+    void computePatchMoments(const cv::Mat& image, const cv::Point2f& center, 
+                             double& m00, double& m10, double& m01, int patch_radius);
 };
 
 #endif // ORB_HPP
