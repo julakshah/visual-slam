@@ -8,6 +8,26 @@ def add_ones(x):
     # map x to homogeneous coords by appending ones for w
     return np.concatenate([x, np.ones((x.shape[0], 1))], axis=1)
 
+def triangulatey(pose1, pose2, pts1, pts2):
+    ret = np.zeros((pts1.shape[0], 4))
+
+    # pose1, pose2 are already world->camera; top 3 rows are projection matrices
+    P1 = pose1[:3, :]
+    P2 = pose2[:3, :]
+
+    for i, (x1, x2) in enumerate(zip(add_ones(pts1), add_ones(pts2))):
+        A = np.zeros((4, 4))
+        A[0] = x1[0] * P1[2] - P1[0]
+        A[1] = x1[1] * P1[2] - P1[1]
+        A[2] = x2[0] * P2[2] - P2[0]
+        A[3] = x2[1] * P2[2] - P2[1]
+
+        _, _, vt = np.linalg.svd(A)
+        X = vt[-1]
+        ret[i] = X
+
+    return ret
+
 def triangulate(pose1, pose2, pts1, pts2):
     # Initialize the result array to store the homogeneous coordinates of the 3D points
     ret = np.zeros((pts1.shape[0], 4))
