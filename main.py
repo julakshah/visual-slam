@@ -29,29 +29,24 @@ class vslam():
 
         # creates the helper objects for Map & Vid
         self.mapp = Map()
-        self.vidd = Vid(self.vid_q)
 
-        self.cap = cv.VideoCapture("v-slam-dataset/test_vid_rect.mp4")
+        cap = cv.VideoCapture("v-slam-dataset/test_vid_rect.mp4")
+        self.vidd = Vid(self.mapp, cap, self.vid_q)
+
+        t_vid = Thread(target=self.vidd.run, daemon=True)
+        t_vid.start()
 
         self.run()
 
     def run(self):
         while True:
-            # Compute image matches
-            ret, img = self.cap.read()
-            print(type(img))
-            img = cv.resize(img, (self.W, self.H))
-            frame = Frame(self.mapp, img)
 
-            if frame.id == 0:
-                continue
-
-            # do feature matching
-            im3 = self.vidd.feature_matching(self.mapp.frames[-2].img, self.mapp.frames[-1].img)
-            im3 = cv.resize(im3, (self.W, self.H))
-
+            img = self.vid_q.get()
+            print(img)
             # display stuff
-            self.run_viewer(self.vid_win, self.vid_surf, im3)
+            if img is not None:
+              self.run_viewer(self.vid_win, self.vid_surf, img)
+
 
     def init_views(self):
         # start sdl2 so that you can do stuff
@@ -60,7 +55,7 @@ class vslam():
         win_flags = (sdl2.SDL_WINDOW_MINIMIZED)
         map_win = sdl2.ext.Window("SLAM Map", (self.W, self.H), flags=win_flags)
         map_win.show()
-        vid_win = sdl2.ext.Window("SLAM Vid", (self.W, self.H), flags=win_flags)
+        vid_win = sdl2.ext.Window("SLAM Vid", (1920, 800), flags=win_flags)
         vid_win.show()
 
         return map_win, vid_win

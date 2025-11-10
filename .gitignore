@@ -1,4 +1,10 @@
+# datasets
 test_data/
 v-slam-dataset/
+T1_rectified/
+
+# virtual environment
 venv-slam/
+
+# other
 __pycache__
