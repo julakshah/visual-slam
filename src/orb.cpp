@@ -62,7 +62,7 @@ void ORBDescriptor::computeOrientation(const cv::Mat& image, std::vector<cv::Key
 
 cv::Mat ORBDescriptor::computeDescriptors(const cv::Mat& image, const std::vector<cv::KeyPoint>& keypoints)
 {
-    std::cout << "Computing descriptors (rotated BRIEF)..." << std::endl;
+    std::cout << "Computing descriptors ..." << std::endl;
 
     // 32 bytes (256 bits) per descriptor
     cv::Mat descriptors(keypoints.size(), 32, CV_8U); 

@@ -4,7 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/features2d.hpp> // For cv::ORB and cv::BFMatcher
-#include "orb.hpp"                // Your ORB class header
+#include "orb.hpp"                // my ORB class header
 
 int main()
 {
@@ -12,7 +12,7 @@ int main()
     std::cout << "Starting live ORB verification..." << std::endl;
     std::cout << "Press 'q' to quit." << std::endl;
 
-    // Your implementation
+    // My implementation
     ORBDescriptor my_orb;
 
     // OpenCV's implementation (for comparison)
@@ -45,12 +45,12 @@ int main()
         cv::cvtColor(frame, gray_frame, cv::COLOR_BGR2GRAY);
 
         // --- 3. DETECT KEYPOINTS ---
-        // Get one common set of keypoints using your FAST stub
+        // Get one common set of keypoints using my FAST stub
         std::vector<cv::KeyPoint> common_keypoints = my_orb.detectKeypoints(gray_frame);
         
         // --- 4. RUN BOTH IMPLEMENTATIONS ---
         
-        // A) Your Implementation
+        // A) my Implementation
         std::vector<cv::KeyPoint> my_keypoints = common_keypoints;
         cv::Mat my_descriptors;
         if (!my_keypoints.empty())
@@ -98,7 +98,7 @@ int main()
         
         // --- 6. VISUALIZE ---
         
-        // A) Draw your keypoints (with your orientation)
+        // A) Draw my keypoints (with my orientation)
         cv::Mat output_frame;
         cv::drawKeypoints(frame, my_keypoints, output_frame, cv::Scalar(0, 255, 0), 
                           cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
@@ -119,7 +119,7 @@ int main()
                     cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
 
         // C) Show the frame
-        cv::imshow("Live ORB Verification (Your Code vs OpenCV)", output_frame);
+        cv::imshow("Live ORB Verification (my Code vs OpenCV)", output_frame);
 
         // --- 7. QUIT ---
         if (cv::waitKey(1) == 'q')
