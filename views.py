@@ -4,9 +4,6 @@ import cv2 as cv
 import time
 import build.orb_project as orb
 
-import sdl2
-import sdl2.ext
-
 def arr_to_keypts(arr):
     """ Convert numpy array to tuple of keypoints """
     keypts = ()
