@@ -2,11 +2,13 @@ from queue import Queue
 import numpy as np
 import cv2 as cv
 import time
+from skimage.measure import ransac
+from skimage.transform import FundamentalMatrixTransform, EssentialMatrixTransform
 import build.orb_project as orb
 
 def arr_to_keypts(arr):
-    """ Convert numpy array to tuple of keypoints """
-    keypts = ()
+    """ Convert numpy array to list of keypoints """
+    keypts = []
     for row in arr:
         # each row is a single keypoint
         if len(row) < 7:
@@ -19,7 +21,7 @@ def arr_to_keypts(arr):
         kpt.response = row[4]
         kpt.octave = int(row[5])
         kpt.class_id = int(row[6])
-        keypts += (kpt,)
+        keypts.append(kpt)
 
     return keypts
 
@@ -32,7 +34,8 @@ class Vid:
         # init ORB algorithm
         self.orb = cv.ORB_create(nfeatures=5000)
         # init Brute Force matcher for
-        self.matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+        # cross check disallows kNN matching, which we're currently using
+        self.matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=False)
 
         self.mapp = mapp
         self.disp_q = disp_queue  # queue to send results to
@@ -48,19 +51,21 @@ class Vid:
                 continue
 
             # do feature matching
-            im3 = self.feature_matching(
+            good_f1, good_f2, Rt, img_with_lines = self.feature_matching(
                 self.mapp.frames[-2].img, self.mapp.frames[-1].img
             )
 
-            self.disp_q.put(im3)
+            self.disp_q.put(img_with_lines)
 
-    def feature_matching(self, im1, im2):
+
+
+    def feature_matching(self, im1, im2, filter_matches=True):
         # args are InputArray image, InputArray mask
         # output is keypoints, descriptors
-        k11, d11 = self.orb.detectAndCompute(im1, None)
-        k22, d22 = self.orb.detectAndCompute(im2, None)
         print("About to extract keypoints and such")
         t0 = time.perf_counter()
+        k1, d1 = self.orb.detectAndCompute(im1, None)
+        k2, d2 = self.orb.detectAndCompute(im2, None)
         #k1, d1 = orb.extract(im1)
         #k2, d2 = orb.extract(im2)
         t1 = time.perf_counter()
@@ -70,23 +75,78 @@ class Vid:
         t2 = time.perf_counter()
         print(f"Time to convert incoming arr: {t2-t1}")
 
-        if d11 is None or d22 is None:
+        if d1 is None or d2 is None:
             print("No Descriptors fourd")
             return im1
-        matches = self.matcher.match(d11, d22)
-        matches = sorted(matches, key=lambda x: x.distance)
+        
+        if not filter_matches:
+            matches = self.matcher.match(d1, d2)
+            matches = sorted(matches, key=lambda x: x.distance)
+            im3 = cv.drawMatches(
+                im1,
+                k1,
+                im2,
+                k2,
+                matches[:10],
+                None,
+                flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
+            )
+            # self.disp_q.put(matches)
+            return im3
+        else:
+            # Only choose matches that are sufficiently better than the second best (Lowe's ratio)
+            matches = self.matcher.knnMatch(d1, d2, 2)
+            filter_scale = 0.95 # 1 accepts everything, 0 rejects everything
+            good_f1 = []
+            good_f2 = []
+            ret = []
+            for m1,m2 in matches:
+                if m1.distance < m2.distance * filter_scale:
+                    good_f1.append(m1.queryIdx)
+                    good_f2.append(m2.trainIdx)
+                    ret.append((k1[m1.queryIdx].pt,k2[m1.trainIdx].pt))
+            
+            print(f"Num filtered matches by Lowe's: {len(set(ret))}")
+            ret = np.array(ret)
+            good_f1 = np.array(good_f1)
+            good_f2 = np.array(good_f2)
 
-        im3 = cv.drawMatches(
-            im1,
-            k11,
-            im2,
-            k22,
-            matches[:10],
-            None,
-            flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-        )
-        # self.disp_q.put(matches)
-        return im3
+            model, pts_rs = ransac((ret[:,0], ret[:,1]),FundamentalMatrixTransform,min_samples=8,residual_threshold=1,max_trials=1000)
+            print(f"Num pts after RANSAC removes outliers: {len(pts_rs)}")
+
+            # Get transform from fundamental matrix
+            W = np.asmatrix([[-1,0,0],[1,0,0],[0,0,1]]) # used for conversion after svd
+            U, d, Vt = np.linalg.svd(model.params) # do SVD on fundamental matrix
+            if np.linalg.det(Vt) < 0:
+                Vt *= -1
+            R = np.dot(np.dot(U,W),Vt) # one of two solutions to rotation matrix
+            if np.sum(R.diagonal()) < 0: # ensure sum of diagonal is positive, else use other sol
+                R = np.dot(np.dot(U, W.T),Vt)
+            t = U[:,2] # get translation vector from U
+
+            # Pose update matrix (transform between frames)
+            Rt = np.eye(4)
+            Rt[:3,:3] = R
+            Rt[:3,3] = t
+
+            # Return simpler matches and pose update (consistent with earlier code for now)
+            matches_simple = self.matcher.match(d1, d2)
+            matches_simple = sorted(matches_simple, key=lambda x: x.distance)
+            im3 = cv.drawMatches(
+                im1,
+                k1,
+                im2,
+                k2,
+                matches_simple[:10],
+                None,
+                flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
+            )
+            print(f"Transformation: {Rt}")
+            return good_f1[pts_rs], good_f2[pts_rs], Rt, im3
+            
+
+
+
 
 
 class Map:

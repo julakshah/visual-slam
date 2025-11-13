@@ -81,31 +81,6 @@ class vslam():
 
         return map_win, vid_win
 
-
-    def run2_viewer(self, win, surf, img):
-        # this doesn't seem to work?
-        events = sdl2.ext.get_events()
-        for event in events:
-            if event.type == sdl2.SDL_QUIT:
-                return
-
-        # paint surface black
-        sdl2.ext.fill(surf, 0)
-        windowArray = sdl2.ext.pixels2d(surf.contents)
-        h, w = windowArray.shape
-
-        img = cv.resize(img, (h, w))
-        bgra = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
-
-        # pack into uint32 (AARRGGBB)
-        packed = (bgra[:,:,3].astype(np.uint32) << 24) | \
-                 (bgra[:,:,2].astype(np.uint32) << 16) | \
-                 (bgra[:,:,1].astype(np.uint32) << 8)  | \
-                 (bgra[:,:,0].astype(np.uint32))
-
-        windowArray[:] = packed.swapaxes(0,1)
-        win.refresh()
-
     def run_viewer(self, win: sdl2.SDL_Window, img):
         # process events
         events = sdl2.ext.get_events()
@@ -124,11 +99,11 @@ class vslam():
         print("right after the fill command")
 
         windowArray = sdl2.ext.pixels2d(surf)
-        h, w = windowArray.shape
+        w, h = windowArray.shape
 
         # resize expects (width, height)
         img = cv.resize(img, (w, h))
-        img = cv.rotate(img, cv.ROTATE_90_COUNTERCLOCKWISE)
+        #img = cv.rotate(img, cv.ROTATE_90_COUNTERCLOCKWISE)
         bgra = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
 
         packed = (bgra[:,:,3].astype(np.uint32) << 24) | \
