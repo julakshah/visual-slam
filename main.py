@@ -24,15 +24,22 @@ class vslam():
 
         # creates the map and vid views
         self.map_win, self.vid_win = self.init_views()
-        self.map_surf = sdl2.SDL_GetWindowSurface(self.map_win.window)
-        self.vid_surf = sdl2.SDL_GetWindowSurface(self.vid_win.window)
+        print("no segfault through init views")
+        #self.map_surf = sdl2.SDL_GetWindowSurface(self.map_win.window)
+        self.map_surf = self.map_win.get_surface()
+        print("no segfault through get window suface (map)")
+        #self.vid_surf = sdl2.SDL_GetWindowSurface(self.vid_win.window)
+        self.vid_surf = self.vid_win.get_surface()
+        print("no segfault through get window surface (vid)")
 
         # creates the helper objects for Map & Vid
         self.mapp = Map()
 
-        cap = cv.VideoCapture("v-slam-dataset/test_vid_rect.mp4")
+        cap = cv.VideoCapture("third_party/test.mp4")
+        #cap = cv.VideoCapture(0)
         self.vidd = Vid(self.mapp, cap, self.vid_q)
 
+        print("no segfault till thread about to start")
         t_vid = Thread(target=self.vidd.run, daemon=True)
         t_vid.start()
 
@@ -45,23 +52,33 @@ class vslam():
             print(img)
             # display stuff
             if img is not None:
-              self.run_viewer(self.vid_win, self.vid_surf, img)
+              self.run_viewer(self.vid_win, img)
 
 
     def init_views(self):
         # start sdl2 so that you can do stuff
         sdl2.ext.init()
+        print("no segfault through sdl init")
 
-        win_flags = (sdl2.SDL_WINDOW_MINIMIZED)
+        #win_flags = (sdl2.SDL_WINDOW_MINIMIZED)
+        win_flags = 0
         map_win = sdl2.ext.Window("SLAM Map", (self.W, self.H), flags=win_flags)
+        print("no segfault through map win")
         map_win.show()
+        print("no segfault through map win show")
         vid_win = sdl2.ext.Window("SLAM Vid", (1920, 800), flags=win_flags)
         vid_win.show()
+        print("no segfault through vid win show")
+        print(f"map_win: {map_win}, vid_win: {vid_win}, map_win.window: {map_win.window}, vid_win.window: {vid_win.window}")
+        if not map_win or not map_win.window:
+            print("map_win or its window is null!")
+        if not vid_win or not vid_win.window:
+            print("vid_win or its window is null!")
 
         return map_win, vid_win
 
 
-    def run_viewer(self, win, surf, img):
+    def run2_viewer(self, win, surf, img):
         # this doesn't seem to work?
         events = sdl2.ext.get_events()
         for event in events:
@@ -83,6 +100,41 @@ class vslam():
                  (bgra[:,:,0].astype(np.uint32))
 
         windowArray[:] = packed.swapaxes(0,1)
+        win.refresh()
+
+    def run_viewer(self, win: sdl2.SDL_Window, img):
+        # process events
+        events = sdl2.ext.get_events()
+        print("right after the get events")
+        for event in events:
+            if event.type == sdl2.SDL_QUIT:
+                return
+
+        #surf = win.get_surface()
+        surf = sdl2.SDL_GetWindowSurface(win.window)
+        print("right after the get surface command")
+        if not surf:
+            err = sdl2.SDL_GetError()
+            raise RuntimeError(f"get_surface failed: {err!r}")
+
+        sdl2.ext.fill(surf, 0)
+        print("right after the fill command")
+
+        # NOTE: no ".contents" here
+        windowArray = sdl2.ext.pixels2d(surf)
+        h, w = windowArray.shape
+
+        # resize expects (width, height)
+        img = cv.resize(img, (w, h))
+        bgra = cv.cvtColor(img, cv.COLOR_BGR2BGRA)
+
+        packed = (bgra[:,:,3].astype(np.uint32) << 24) | \
+                (bgra[:,:,2].astype(np.uint32) << 16) | \
+                (bgra[:,:,1].astype(np.uint32) << 8)  | \
+                (bgra[:,:,0].astype(np.uint32))
+
+        #windowArray[:] = packed.swapaxes(0, 1)
+        windowArray[:] = packed
         win.refresh()
 
 

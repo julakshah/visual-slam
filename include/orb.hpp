@@ -11,17 +11,17 @@ public:
     ORBDescriptor();
 
     // Detect keypoints (FAST)
-    std::vector<cv::KeyPoint> detectKeypoints(const cv::Mat& image);
+    static std::vector<cv::KeyPoint> detectKeypoints(const cv::Mat& image);
 
     // Compute orientation using intensity moments
-    void computeOrientation(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints);
+    static void computeOrientation(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints);
 
     // Compute binary descriptor
-    cv::Mat computeDescriptors(const cv::Mat& image, const std::vector<cv::KeyPoint>& keypoints);
+    static cv::Mat computeDescriptors(const cv::Mat& image, const std::vector<cv::KeyPoint>& keypoints);
 
 private:
     // Helper for computing raw moments in a patch
-    void computePatchMoments(const cv::Mat& image, const cv::Point2f& center, 
+    static void computePatchMoments(const cv::Mat& image, const cv::Point2f& center, 
                              double& m00, double& m10, double& m01, int patch_radius);
 };
 
