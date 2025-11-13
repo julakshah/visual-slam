@@ -1,15 +1,17 @@
 from queue import Queue
-import numpy as np
 from threading import Thread
 from time import sleep
-import cv2 as cv
 
+import cv2 as cv
+import numpy as np
 import sdl2
 import sdl2.ext
 
 # local script installs
 from views import Map, Vid, Frame
-import camera_calib
+
+
+fpath = "v-slam-dataset/test_vid_rect.mp4"
 
 class vslam():
     def __init__(self):
@@ -30,7 +32,7 @@ class vslam():
         # creates the helper objects for Map & Vid
         self.mapp = Map()
 
-        cap = cv.VideoCapture("v-slam-dataset/test_vid_rect.mp4")
+        cap = cv.VideoCapture(fpath)
         self.vidd = Vid(self.mapp, cap, self.vid_q)
 
         t_vid = Thread(target=self.vidd.run, daemon=True)
@@ -42,7 +44,6 @@ class vslam():
         while True:
 
             img = self.vid_q.get()
-            print(img)
             # display stuff
             if img is not None:
               self.run_viewer(self.vid_win, self.vid_surf, img)
@@ -88,10 +89,6 @@ class vslam():
 
 if __name__ == "__main__":
     vslam()
-
-
-
-
 
 
 

@@ -1,9 +1,23 @@
 from queue import Queue
 import numpy as np
 import cv2 as cv
+import yaml
 
 import sdl2
 import sdl2.ext
+
+# define camera intrinsics
+with open("v-slam-dataset/intrinsics.yaml") as f:
+    camera = yaml.safe_load(f)
+
+# Create camera matrix K
+K = np.array(
+    [[camera["fx"], 0, camera["cx"]], [0, camera["fy"], camera["cy"]], [0, 0, 1]]
+)
+Kinv = np.linalg.inv(K)
+
+print(f"K is \n{K}")
+print(f"Kinv is \n{Kinv}")
 
 
 class Vid:
@@ -54,8 +68,83 @@ class Vid:
             None,
             flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
         )
-        # self.disp_q.put(matches)
+
+        print(f"essential is \n{E}")
         return im3
+
+    def get_essential_matrix(self, k1, k2):
+        # Do image formation for 3Dness
+        pts1 = np.float32([k1[m.queryIdx].pt for m in matches])
+        pts2 = np.float32([k2[m.trainIdx].pt for m in matches])
+        F, inliers = cv.findFundamentalMat(pts1, pts2, cv.FM_RANSAC, 3.0)
+        E = K.T @ F @ K
+
+        mask = [inliers.ravel() == 1]
+        pts1_inliers = pts1[mask]
+        pts2_inliers = pts1[mask]
+
+        # Decompose essential matrix
+        _, R, t, mask = cv.recoverPose(E, pts1_inliers, pts2_inliers, K)
+
+        return R, t
+
+    def triangulate(pose1, pose2, pts1, pts2):
+        """
+        Use linear algebrea to triangulate the position of the points in 3D
+        space. These points should automatically be mapped into the world frame.
+          pose1: 3x4 matrix translating world -> camera1
+          pose2: 3x4 matrix translating world -> camera2
+          pts1: the 2D coordinates of the points in pose1
+          pts2: the 2D coordinates of the poitns in pose2
+        """
+        # variable to store triangulated poitns
+        pts3d = np.zeros((pts1.shape[0], 4))
+
+        # compute projection matrices
+        P1 = K @ self.fast_pose_inverse(pose1)
+        P2 = K @ self.fast_pose_inverse(pose2)
+
+        for i, p in enumerate(zip(self.add_ones(pts1), self.add_ones(pts2)))
+          u1 = p[0][0]; v1 = p[0][1];
+          u2 = p[1][0]; v2 = p[1][1];
+
+          A = np.zeros((4,4))
+          A[0] = u1 * P1[3] - P1[1]
+          A[1] = u1 * P1[3] - P1[2]
+          A[2] = u1 * P2[3] - P2[1]
+          A[3] = u1 * P2[3] - P2[2]
+
+          _, _, vt = np.linalg.svd(A)
+
+          pts3d[i] = vt[3]
+
+        return pts3d
+
+
+    def fast_pose_inverse(self, pose):
+        """
+        uses orthogonal property of rotation matrices to speed up inversion.
+        Args:
+          pose: a 3x4 matrix [R|t]
+        Returns:
+          pose_inv: a 3x4 matrix inversion of the input pose
+        """
+
+        R = pose[:3, :3]
+        t = pose[:3, 3]
+
+        pose_inv = np.zeros((3, 4))
+        pose_inv[:, :3] = R.T
+        pose_inv[:, 3] = -R.T @ t
+
+        return pose_inv
+
+    def add_ones(pts):
+        """
+        Helper function to add a column of ones to a 2D array (homogeneous
+        coordinates).
+        """
+        return np.hstack([pts, np.ones((pts.shape[0], 1))])
 
 
 class Map:
