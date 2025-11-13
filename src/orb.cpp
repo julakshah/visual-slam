@@ -18,12 +18,84 @@ ORBDescriptor::ORBDescriptor() {}
 
 std::vector<cv::KeyPoint> ORBDescriptor::detectKeypoints(const cv::Mat& image)
 {
+
+    /*
+    For pixel I_p in image:
+        Create bresenham circle of radius 3 around I_p
+        Count number of pixels in circle with intensity > I_p + threshold
+        Count number of pixels in circle with intensity < I_p - threshold
+        If either count >= 12:
+            Mark I_p as keypoint
+
+    */
+
     std::cout << "Detecting keypoints (stub)..." << std::endl;
     std::vector<cv::KeyPoint> keypoints;
     int threshold = 20; // Intensity difference threshold
-    
+    int radius = 3;    // Radius for the bresenham circle
+
+    // Bresenham circle offsets for radius
+    const int circle[16][2] = {
+    {0, -3}, {1, -3}, {2, -2}, {3, -1},
+    {3, 0}, {3, 1}, {2, 2}, {1, 3},
+    {0, 3}, {-1, 3}, {-2, 2}, {-3, 1},
+    {-3, 0}, {-3, -1}, {-2, -2}, {-1, -3}
+    };
+
+    // i is row, j is column
+    for (int i = radius; i < image.rows - radius; ++i) { // for each row, where the circle is not over the edge
+        for (int j = radius; j < image.cols - radius; ++j) { // for each column, where the circle is not over the edge
+            uchar I_p = image.at<uchar>(i, j); // Keypoint pixel
+            int brighter_count = 0;
+            int darker_count = 0;
+
+            bool valid_keypoint = false;
+
+            // Check I1, I5, I9, I13 to quickly eliminate a subset of non-keypoints
+            uchar I_1 = image.at<uchar>(i + circle[0][1], j + circle[0][0]);
+            uchar I_5 = image.at<uchar>(i + circle[4][1], j + circle[4][0]);
+            uchar I_9 = image.at<uchar>(i + circle[8][1], j + circle[8][0]);
+            uchar I_13 = image.at<uchar>(i + circle[12][1], j + circle[12][0]);
+
+            if ((I_1 <= I_p - threshold) + (I_5 <= I_p - threshold) +
+                (I_9 <= I_p - threshold) + (I_13 <= I_p - threshold) >= 3) {
+
+                for (int k = 0; k < 16; ++k) {
+                    int cx = j + circle[k][0];
+                    int cy = i + circle[k][1];
+                    uchar I_c = image.at<uchar>(cy, cx); // Comparison pixel intensity
+
+                    if (I_c >= I_p + threshold)
+                    {
+                        brighter_count++;
+                        darker_count = 0;
+                    }
+                    else if (I_c <= I_p - threshold)
+                    {
+                        darker_count++;
+                        brighter_count = 0;
+                    }
+                    else
+                    {
+                        brighter_count = 0;
+                        darker_count = 0;
+                    }
+
+                    if (brighter_count >= 12 || darker_count >= 12)
+                    {
+                        valid_keypoint = true;
+                        break;
+                    }
+                }
+            }
+
+            if (valid_keypoint)
+                keypoints.emplace_back(cv::KeyPoint((float)j, (float)i, 7.f));
+        }
+    }
+
     // Outsource to OpenCV
-    cv::FAST(image, keypoints, threshold, true);
+    // cv::FAST(image, keypoints, threshold, true);
     
     return keypoints;
 }
