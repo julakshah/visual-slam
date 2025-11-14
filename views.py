@@ -73,13 +73,22 @@ class Vid:
             self.triangulate(pose1, pose2, pts1, pts2)
 
     def feature_matching(self, im1, im2):
-        # args are InputArray image, InputArray mask
-        # output is keypoints, descriptors
-        k1, d1 = self.orb.detectAndCompute(im1, None)
-        k2, d2 = self.orb.detectAndCompute(im2, None)
+        # ensure grayscale for ORB
+        if im1.ndim == 3:
+            im1_gray = cv.cvtColor(im1, cv.COLOR_BGR2GRAY)
+        else:
+            im1_gray = im1
+        if im2.ndim == 3:
+            im2_gray = cv.cvtColor(im2, cv.COLOR_BGR2GRAY)
+        else:
+            im2_gray = im2
 
-        if d1 is None or d2 is None:
-            print("No Descriptors found")
+        k1, d1 = self.orb.detectAndCompute(im1_gray, None)
+        k2, d2 = self.orb.detectAndCompute(im2_gray, None)
+
+        if d1 is None or d2 is None or len(k1) == 0 or len(k2) == 0:
+            # no features
+            # return a display image (draw nothing) and None pts
             return im1, None, None
 
         matches = self.matcher.match(d1, d2)
@@ -90,65 +99,63 @@ class Vid:
             k1,
             im2,
             k2,
-            matches[:10],
+            matches[:50],  # draw more to see more info
             None,
             flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
         )
 
+        # build arrays only from valid matches
         pts1 = np.float32([k1[m.queryIdx].pt for m in matches])
         pts2 = np.float32([k2[m.trainIdx].pt for m in matches])
 
         return im3, pts1, pts2
 
     def get_frame_transformation(self, pts1, pts2):
-        # Do image formation for 3Dness
+        # find fundamental matrix (in pixels)
         F, inliers = cv.findFundamentalMat(pts1, pts2, cv.FM_RANSAC, 3.0)
+
+        if F is None or inliers is None:
+            return np.eye(3), np.zeros((3, 1)), None, None
+
+        # compute essential
         E = K.T @ F @ K
 
-        # Check essential matrix properties
+        # enforce E singular values (two equal, one zero)
         U, S, Vt = np.linalg.svd(E)
-        # print(f"Singular values before correction: {S}")
-
-        # Enforce essential matrix constraint (two equal singular values, one zero)
-        S_corrected = [(S[0] + S[1]) / 2, (S[0] + S[1]) / 2, 0]
+        S_corrected = [(S[0] + S[1]) / 2.0, (S[0] + S[1]) / 2.0, 0.0]
         E = U @ np.diag(S_corrected) @ Vt
-        # collapse mask into a vector
-        mask = np.ravel([inliers.ravel() == 1])
 
-        pts1_inliers = pts1[mask]
-        pts2_inliers = pts2[mask]
+        # build boolean mask of inliers
+        mask_bool = inliers.ravel() == 1
+        pts1_inliers = pts1[mask_bool]
+        pts2_inliers = pts2[mask_bool]
 
-        # Decompose essential matrix
-        _, R, t, mask = cv.recoverPose(E, pts1_inliers, pts2_inliers, K)
+        if pts1_inliers.shape[0] < 5:
+            # not enough inliers
+            return np.eye(3), np.zeros((3, 1)), None, None
 
-        # Normalize translation to unit length for consistent scale
-        t = t / np.linalg.norm(t)
+        # recoverPose returns inliers too; we pass K and pixel points
+        _, R, t, pose_mask = cv.recoverPose(E, pts1_inliers, pts2_inliers, K)
+
+        # normalize translation (direction only)
+        t = t / (np.linalg.norm(t) + 1e-9)
 
         return R, t, pts1_inliers, pts2_inliers
 
     def triangulate(self, pose1, pose2, pts1, pts2):
-        """
-        Use linear a_, _, vt = np.linalg.svd(A)lgebrea to triangulate the position of the points in 3D
-        space. These points should automatically be mapped into the world frame.
-          pose1: 3x4 matrix translating world -> camera1
-          pose2: 3x4 matrix translating world -> camera2
-          pts1: the 2D coordinates of the points in pose1
-          pts2: the 2D coordinates of the poitns in pose2
-        """
-        # variable to store triangulated points
+        if pts1 is None or pts2 is None or pts1.shape[0] == 0:
+            return
+
+        # Prepare homogeneous output
         pts3d = np.zeros((pts1.shape[0], 4))
 
-        # compute projection matrices
-        # P1 = K @ self.fast_pose_inverse(pose1)
-        # P2 = K @ self.fast_pose_inverse(pose2)
+        # Projection matrices: P = K * [R | t]
         P1 = K @ pose1[:3, :]
         P2 = K @ pose2[:3, :]
 
-        for i, p in enumerate(zip(pts1, pts2)):
-            u1 = p[0][0]
-            v1 = p[0][1]
-            u2 = p[1][0]
-            v2 = p[1][1]
+        for i, (p1, p2) in enumerate(zip(pts1, pts2)):
+            u1, v1 = p1
+            u2, v2 = p2
 
             A = np.zeros((4, 4))
             A[0] = u1 * P1[2] - P1[0]
@@ -157,23 +164,22 @@ class Vid:
             A[3] = v2 * P2[2] - P2[1]
 
             _, _, vt = np.linalg.svd(A)
+            X_hom = vt[-1]  # last row is smallest singular vector
+            pts3d[i] = X_hom / (X_hom[3] + 1e-12)  # normalize w to avoid huge numbers
 
-            pts3d[i] = vt[3]
+        # Convert to Cartesian
+        pts3d_cartesian = pts3d[:, :3]  # already normalized above
 
-        # Filter points based on quality
-        # Convert to 3D Cartesian
-        pts3d_cartesian = pts3d[:, :3] / pts3d[:, 3:4]
-
-        # Calculate z-depth in each camera frame
+        # compute depth in camera frames: z = R * X + t
         z1 = (pose1[:3, :3] @ pts3d_cartesian.T + pose1[:3, 3:4])[2, :]
         z2 = (pose2[:3, :3] @ pts3d_cartesian.T + pose2[:3, 3:4])[2, :]
 
-        # Filter: keep points in front of both cameras and within reasonable distance
-        mask = (z1 > 0) & (z2 > 0) & (z1 < 100) & (z2 < 100) & (pts3d[:, 3] > 0)
+        mask = (z1 > 0) & (z2 > 0) & (z1 < 100) & (z2 < 100)
 
         good_points = pts3d[mask]
 
-        if len(good_points) > 0:
+        if good_points.shape[0] > 0:
+            # store homogeneous points
             self.mapp.points.append(good_points)
 
     def fast_pose_inverse(self, pose):
