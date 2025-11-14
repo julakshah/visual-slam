@@ -81,6 +81,10 @@ In implementing certain parts of the visual odometry pipeline, we ran into a num
 
 ### Challenges
 
+#### Performance
+
+As of now, our code does not function well when measured against the third-party implementation as a benchmark. We added a helper function computing the reprojection error for a single frame, and measured the third-party implementation to have a root mean square error of slightly over 0.1. We measured our code to have a RMS reprojection error anywhere between 1 and sometimes 50 or near 100, indicating notably worse performance of our code. This occurs even with the default keypoint identification from OpenCV, indicating a problem with our matching, pose estimation, or triangulation pipeline. This error is also visually apparent --- for a video in which the camera moves forwards, the poses graphed face notably sideways relative to the direction of motion, indicating the transform is off for some reason. 
+
 #### ORB
 
 One of two major issues we overlooked when implementing ORB was not initially handling edge cases nicely when generating descriptors --- if we tried to sample a point outside the bounds of the image, we would move to the next keypoint in the loop, yet keep the previous descriptor at its default value of zero. This resulted in any keypoints within 16 pixels of the image boundary having an identical descriptor and erroneously matching with each other exactly. Integrating this with the matching visualization code was helpful in showing us this erroneous matching in action and letting us debug it.
@@ -96,6 +100,14 @@ Rendering our point clouds and images proved to be consistently one of the most 
 Additionally, we decided to use the Python wrapper for SDL2 for our own implementation given its versatility. However, when integrating the different components of our code, we consistently ran into segfaults when trying to access a SDL_Surface (and later, sometimes, SDL_Texture) object. This happened independent of our own C++-style code, and backtraces with GDB pointed to the segfault occurring from a function in the `libSDL2-2.0.so.0` library. The segfault would only occur when not running in the VSCode Python debugger, which made checking for null pointers difficult, and getting a more helpful backtrace from GDB would have required building Python and SDL2 with debug symbols, which we didn't think would be the most useful application of our time. The segfault would occur non-deterministically, and seemed tied to memory or some other hardware state --- on one occasion, we recorded 25 successful times running our program, and then a segfault on the 26th and a few subsequent times after that.
 
 We've included some of the testing scripts we used for isolating what was causing the segfault and what wasn't in the `sdl2_test/` directory. Of these, `sdl2test.py` and `segfaults_not.py` never segfault, while `segfaults.py` does. While we tried debugging this further, the occurrence of segfaults was infrequent enough that we concluded they seem less present with SDL_Texture instead of SDL_Surface, and have left it at that. 
+
+#### Takeaways
+
+Our primary takeaway from this project is to not commit ourselves too heavily to testing existing implementations of VO, especially if doing so is not our end goal. Combined, we spent an excessive amount of time stitching together an existing implementation which we ultimately abandoned after deciding it was unlikely to have worked in the first place. This used up a large amount of time that could have been more productively spent integrating our own code with a pipeline that would work closer to out-of-the-box, or even trying to develop an implementation entirely from the ground up --- struggling to implement the dubious implementation wasn't as helpful to our own learning, and certainly not to our progress, as building off of a working one was. Similarly, we spent multiple hours trying to find the cause of a segmentation fault in the Python bindings for SDL2, a problem effectively unrelated to visual odometry, when we could have attempted to use a different library for visualizing.
+
+In the future, we plan to be less wedded to the initial libraries and pieces of code we find, knowing that when these pieces of code give us trouble that seems unrelated to our own project work, we can probably find another implementation or library that would let us more quickly return to the actual content of the project. 
+
+We've also come to appreciate having more checks for invalid results in certain stages of the pipeline, given the time it took to catch a bug resulting in singular transform matrices. Ensuring the determinant of the transform is nonzero helps check this easily, but failing to do it led us to miss a typo in our processing of the fundamental matrix that was giving us singular matrices. 
 
 ## Future Work
 
