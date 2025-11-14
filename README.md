@@ -56,7 +56,7 @@ For each keypoint, BRIEF works by considering a circular patch of pixels around 
 By assigning a bitstring descriptor for each keypiont, the similarity between two keypoints can be quickly calculated by simply finding the hamming distance between two bitstrings with the sum of an XOR operation across the two bit strings.
 
 <!--
-The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  -->
+The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  --> -->
 
 ### ORB
 ORB (Oriented FAST and Rotated BRIEF) is a combination of FAST and BRIEF with some slight changes. The most important is the addition of orientation correction between the FAST and BRIEF operations. Orientation correction is done by __.
