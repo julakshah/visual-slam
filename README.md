@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Visual Odometry
 The goal of this project is to implement visual odometry with a monocular camera. By identifying keypoints, tracking them across multiple frames, and using that information to determine the camera's motion.
 
@@ -20,3 +21,10 @@ The BRIEF algorithm starts by attempting to normalize the orientation of an imag
 
 ## Challenges and Takeaways
 ## Future Work
+=======
+# visual-slam
+
+## Third-party code
+
+This project includes code modified and adapted from [SLAMPy-Monocular-SLAM-implementation-in-Python](https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file), which does not have a license specified. 
+>>>>>>> ben-test
