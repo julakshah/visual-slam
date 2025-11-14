@@ -6,14 +6,12 @@ import ctypes
 import cv2 as cv
 import faulthandler
 faulthandler.enable()
-
 import sdl2
 import sdl2.ext
 
 # local script installs
 from views import Map, Vid, Frame
 from third_party.descriptor import Descriptor
-import camera_calib
 
 class vslam():
     def __init__(self):
@@ -67,8 +65,7 @@ class vslam():
         self.vid_tex_w = 0
         self.map_tex_h = 0
         self.vid_tex_h = 0
-
-
+        
         # creates the helper objects for Map & Vid
         # self.mapp = Map()
         self.mapp = Descriptor()

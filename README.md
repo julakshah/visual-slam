@@ -56,7 +56,7 @@ For each keypoint, BRIEF works by considering a circular patch of pixels around 
 By assigning a bitstring descriptor for each keypiont, the similarity between two keypoints can be quickly calculated by simply finding the hamming distance between two bitstrings with the sum of an XOR operation across the two bit strings.
 
 <!--
-The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  --> -->
+The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  -->
 
 ### ORB
 ORB (Oriented FAST and Rotated BRIEF) is a combination of FAST and BRIEF with some slight changes. The most important is the addition of orientation correction between the FAST and BRIEF operations. Orientation correction is done by __.
@@ -84,6 +84,10 @@ Additionally, we decided to use the Python wrapper for SDL2 for our own implemen
 We've included some of the testing scripts we used for isolating what was causing the segfault and what wasn't in the `sdl2_test/` directory. Of these, `sdl2test.py` and `segfaults_not.py` never segfault, while `segfaults.py` does. While we tried debugging this further, the occurrence of segfaults was infrequent enough that we concluded they seem less present with SDL_Texture instead of SDL_Surface, and have left it at that. 
 
 ## Future Work
+
+The logical next step for functionality of our program would include some sort of bundle adjustment for the poses and keypoints over time --- currently, we treat everything recorded in the previous frames as fixed, and do not correct them or optimize them. More sophisticated visual odometry, as well as SLAM, relies on continually optimizing the previous poses to minimize the total reprojection error (difference between predictions and observations of keypoints) across all recorded poses. 
+
+Another next step, however, would be refining our algorithm and testing to make sure it functions to an extent --- we're still not satisfied with the performance we have, both in terms of reprojection error as well as speed. Correcting our algorithm until we obtain a similar reprojection error to the third-party implementation is therefore a higher priority, as would be seeing what changes could be made to the C++ code to improve its speed --- we figure that OpenCV likely uses every optimization available to run quickly, but there are still likely approachable changes that we could make to our code to improve its speed.
 
 ## Other notes
 

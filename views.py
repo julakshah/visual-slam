@@ -54,7 +54,7 @@ class Vid:
         Fy = 500
         cx = 1920//2
         cy = 1280//2
-        self.K = np.asarray([[Fx,0,cx//2],[0,Fy,cy//2],[0,0,1]])
+        self.K = np.asarray([[Fx,0,cx],[0,Fy,cy],[0,0,1]])
 
         # init ORB algorithm
         self.orb = cv.ORB_create(nfeatures=5000)
@@ -68,8 +68,12 @@ class Vid:
 
         #self.desc_dict = Descriptor() # holds global state, num frames
         self.mapp.create_viewer()
+        self.rms_err_list = [] # record the rms error over time
 
     def run(self):
+        """
+        Main loop of VO
+        """
         while True:
             # Compute image matches
             ret, img = self.cap.read()
@@ -103,6 +107,7 @@ class Vid:
             pts3d = pts4d[:,:3]
             per_pt_err, mean_err, rms_err = compute_reprojection_error(pts3d,kp2,Rt,self.K)
             print(f"Mean reprojection error: {mean_err}, RMS error: {rms_err}")
+            self.rms_err_list.append(rms_err)
 
             unmatched_points = np.array([self.mapp.frames[-1].pts[i] is None for i in good_f1])
             print(f"Num unmatched pts located: {len(unmatched_points)}")
@@ -245,11 +250,11 @@ def feature_extraction(frame, orb_alg):
     """ Extract keypoints and descriptors from an image and store them in the Frame object """
     print("About to extract keypoints and such")
     t0 = time.perf_counter()
-    k1, d1 = orb_alg.detectAndCompute(frame.img, None)
-    #k1, d1 = orb.extract(frame.img)
+    #k1, d1 = orb_alg.detectAndCompute(frame.img, None)
+    k1, d1 = orb.extract(frame.img)
     t1 = time.perf_counter()
     print(f"Time to get keypts + descriptors: {t1-t0}")
-    #k1 = arr_to_keypts(k1)
+    k1 = arr_to_keypts(k1)
     t2 = time.perf_counter()
     print(f"Time to convert incoming arr: {t2-t1}")
 
