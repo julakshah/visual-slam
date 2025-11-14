@@ -57,8 +57,10 @@ std::vector<cv::KeyPoint> ORBDescriptor::detectKeypoints(const cv::Mat& image)
             uchar I_9 = image.at<uchar>(i + circle[8][1], j + circle[8][0]);
             uchar I_13 = image.at<uchar>(i + circle[12][1], j + circle[12][0]);
 
-            if ((I_1 <= I_p - threshold) + (I_5 <= I_p - threshold) +
-                (I_9 <= I_p - threshold) + (I_13 <= I_p - threshold) >= 3) {
+            if (((I_1 <= I_p - threshold) + (I_5 <= I_p - threshold) +
+                (I_9 <= I_p - threshold) + (I_13 <= I_p - threshold) >= 3) ||
+                ((I_1 >= I_p + threshold) + (I_5 >= I_p + threshold) +
+                (I_9 >= I_p + threshold) + (I_13 >= I_p + threshold) >= 3)) {
 
                 for (int k = 0; k < 16; ++k) {
                     int cx = j + circle[k][0];
