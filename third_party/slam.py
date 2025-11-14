@@ -43,6 +43,11 @@ def generate_SLAM(image):
     print("Thisis a test1")
     pts4d = triangulate(frame1.pose, frame2.pose, frame1.key_pts[x1], frame2.key_pts[x2])
     pts4d /= pts4d[:, 3:]
+
+    pts3d = pts4d[:, :3]
+    per_pt_err, mean_err, rms_err = compute_reprojection_error(pts3d,frame2.key_pts[x2],Id,K)
+    print(f"Mean reprojection error: {mean_err}, RMS error: {rms_err}")
+
     unmatched_points = np.array([frame1.pts[i] is None for i in x1])
     print("Adding:  %d points" % np.sum(unmatched_points))
     good_pts4d = (np.abs(pts4d[:, 3]) > 0.005) & (pts4d[:, 2] > 0) & unmatched_points
@@ -66,6 +71,43 @@ def generate_SLAM(image):
     # 3-D display
     desc_dict.display()
 
+
+def compute_reprojection_error(points_3d, points_2d_obs, Rt, K):
+    """
+    points_3d: (N, 3) world coordinates
+    points_2d_obs: (N, 2) observed pixel coords
+    Rt: (4,4) transform ([R, t],[0,0,0,1])
+    K: (3,3) camera intrinsic matrix
+    """
+    R = Rt[:3,:3] # get rotation
+    t = Rt[:3,3] # get translation
+
+    # map world coords to camera coords
+    X_cam = (R @ points_3d.T + t.reshape(3, 1)).T
+
+    # Normalize
+    x = X_cam[:, 0] / X_cam[:, 2]
+    y = X_cam[:, 1] / X_cam[:, 2]
+
+    # Apply intrinsics
+    #fx, fy = K[0, 0], K[1, 1]
+    #cx, cy = K[0, 2], K[1, 2]
+
+    #u_pred = fx * x + cx
+    #v_pred = fy * y + cy
+    #pts_2d_pred = np.stack([u_pred, v_pred], axis=1)
+    pts_2d_pred = np.stack([x,y],axis=1)
+
+    # error per each point
+    diffs = points_2d_obs - pts_2d_pred
+    per_point_err = np.linalg.norm(diffs, axis=1)
+
+    mean_err = per_point_err.mean()
+    rms_err = np.sqrt((per_point_err ** 2).mean())
+
+    return per_point_err, mean_err, rms_err
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("%s takes in .mp4 as an arg" %sys.argv[0])
@@ -77,7 +119,7 @@ if __name__ == "__main__":
     # for i in range(num_frames):
     #     print(f"Starting frame {i}")
     #     num = str(i).zfill(4)
-    #     img_path = f"../../sequence_02/0{num}.jpg"
+    #     img_path = f"../sequence_02/0{num}.jpg"
     #     frame = cv2.imread(img_path)
     #     generate_SLAM(frame)
     

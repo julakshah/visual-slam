@@ -1,29 +1,24 @@
-from queue import Queue
 import numpy as np
 import cv2 as cv
 import time
 from skimage.measure import ransac
-from skimage.transform import FundamentalMatrixTransform, EssentialMatrixTransform
+from skimage.transform import FundamentalMatrixTransform
 import build.orb_project as orb
 from third_party.triangulation import triangulate # triangulate pts in space
 from third_party.cameraFrame import normalize, denormalize # used for camera intrinsics calc
 from third_party.descriptor import Descriptor, Point
 
-
-class CameraFrame(object):
-    def __init__(self, desc_dict, image, count):
-        self.count = count
-        self.count_inv = np.linalg.inv(self.count)
-        self.pose = np.eye(4)
-        self.h, self.w = image.shape[0:2]    
-        key_pts, self.descriptors = featureMapping(image)
-        self.key_pts = normalize(self.count_inv, key_pts)
-        self.pts = [None]*len(self.key_pts)
-        self.id = len(desc_dict.frames)
-        desc_dict.frames.append(self)
-
 def arr_to_keypts(arr):
-    """ Convert numpy array to array of keypoints """
+    """
+    Convert numpy array to list of keypoints 
+    We pass keypoints via Pybind as a (N,7) numpy arr
+    We want a list of KeyPoint objects
+
+    Args:
+        arr: (N,7) Numpy array of floats
+    Returns:
+        keypts: list[cv2.KeyPoint()] of converted keypts
+    """
     keypts = []
     for row in arr:
         # each row is a single keypoint
@@ -41,12 +36,19 @@ def arr_to_keypts(arr):
 
     return keypts
 
-def arr_to_desc(arr):
-    """ Convert numpy array to list of descriptors """
-    descs = []
-
 class Vid:
+    """
+    Class to run visual odom every frame, hold persistent parameters
+    """
     def __init__(self, mapp, cap, disp_queue):
+        """
+        Initialize Vid object
+        Args:
+            mapp (Descriptor): object to hold persistent map and pose data for plotting 
+                (defined in third party file)
+            cap (cv2.VideoCapture): video capture argument to get frames from
+            disp_queue (Queue): queue to pass annotated images for viewing with SDL
+        """
         # Camera intrinsic matrix K --- ballpark nums
         Fx = 500
         Fy = 500
@@ -87,6 +89,8 @@ class Vid:
             # Pose update --- apply transformation to previous pose
             self.mapp.frames[-1].pose = np.dot(Rt, self.mapp.frames[-2].pose)
 
+            print(f"Transform: {Rt}")
+
             #for i,idx in enumerate(good_f2):
             #    if self.mapp.frames[-2].pts[idx] is not None:
             #        self.mapp.frames[-2].pts[idx].add_observation(self.mapp.frames[-1],good_f1[i])
@@ -95,14 +99,21 @@ class Vid:
             kp2 = np.asarray([self.mapp.frames[-2].keypt_coords[i] for i in good_f2])
             pts4d = triangulate(self.mapp.frames[-1].pose, self.mapp.frames[-2].pose, kp1, kp2)
             pts4d /= pts4d[:, 3:]
-            unmatched_points = np.array([self.mapp.frames[-1].keypt_coords[i] is None for i in good_f1])
+
+            pts3d = pts4d[:,:3]
+            per_pt_err, mean_err, rms_err = compute_reprojection_error(pts3d,kp2,Rt,self.K)
+            print(f"Mean reprojection error: {mean_err}, RMS error: {rms_err}")
+
+            unmatched_points = np.array([self.mapp.frames[-1].pts[i] is None for i in good_f1])
             print(f"Num unmatched pts located: {len(unmatched_points)}")
             good_pts4d = (np.abs(pts4d[:, 3]) > 0.005) & (pts4d[:, 2] > 0) & unmatched_points
+            print(f"How many good points to add to the drawing? {sum([int(x) for x in good_pts4d])}")
+            #print(f"Good pts: {good_pts4d}")
 
             # Add points to known pts to draw
             for i,p in enumerate(pts4d):
-                #if not good_pts4d[i]:
-                #    continue
+                if not good_pts4d[i]:
+                    continue
                 #print("good!")
                 pt = Point(self.mapp, p)
                 pt.add_observation(self.mapp.frames[-1], good_f1[i])
@@ -135,7 +146,7 @@ class Vid:
         else:
             # Only choose matches that are sufficiently better than the second best (Lowe's ratio)
             matches = self.matcher.knnMatch(d1, d2, 2)
-            filter_scale = 0.95 # 1 accepts everything, 0 rejects everything
+            filter_scale = 0.55 # 1 accepts everything, 0 rejects everything
             good_f1 = []
             good_f2 = []
             ret = []
@@ -157,8 +168,8 @@ class Vid:
 
             # Convert to essential matrix using intrinsic matrix
             E = self.K.T @ model.params @ self.K
-            #print(f"Fundamental Matrix = {model.params}\n")
-            #print(f"Essential Matrix: {E}\n\n")
+            print(f"Fundamental Matrix = {model.params}\n")
+            print(f"Essential Matrix: {E}\n\n")
             W = np.asmatrix([[0,-1,0],[1,0,0],[0,0,1]]) # used for conversion after svd
             U, d, Vt = np.linalg.svd(E) # do SVD on essential matrix
             if np.linalg.det(Vt) < 0:
@@ -189,12 +200,53 @@ class Vid:
             #print(f"Transformation: {Rt}")
             return good_f1[pts_rs], good_f2[pts_rs], Rt, im3
 
+def compute_reprojection_error(points_3d, points_2d_obs, Rt, K):
+    """
+    points_3d: (N, 3) world coordinates
+    points_2d_obs: (N, 2) observed pixel coords
+    Rt: (4,4) transform ([R, t],[0,0,0,1])
+    K: (3,3) camera intrinsic matrix
+    """
+    Rt = np.linalg.inv(Rt)
+    R = Rt[:3,:3] # get rotation
+    t = Rt[:3,3] # get translation
+
+    # map world coords to camera coords
+    X_cam = (R @ points_3d.T + t.reshape(3, 1)).T
+
+    # Normalize
+    x = X_cam[:, 0] / X_cam[:, 2]
+    y = X_cam[:, 1] / X_cam[:, 2]
+
+    # Apply intrinsics
+    #fx, fy = K[0, 0], K[1, 1]
+    #cx, cy = K[0, 2], K[1, 2]
+
+    #u_pred = fx * x + cx
+    #v_pred = fy * y + cy
+    #pts_2d_pred = np.stack([u_pred, v_pred], axis=1)
+    pts_2d_pred = np.stack([x, y], axis=1)
+
+    print("Sample obs vs pred:")
+    for i in range(min(5, len(points_2d_obs))):
+        print("obs:", points_2d_obs[i], "pred:", pts_2d_pred[i])
+
+    # error per each point
+    diffs = points_2d_obs - pts_2d_pred
+    per_point_err = np.linalg.norm(diffs, axis=1)
+
+    mean_err = per_point_err.mean()
+    rms_err = np.sqrt((per_point_err ** 2).mean())
+
+    return per_point_err, mean_err, rms_err
+
+
 def feature_extraction(frame, orb_alg):
     """ Extract keypoints and descriptors from an image and store them in the Frame object """
     print("About to extract keypoints and such")
     t0 = time.perf_counter()
     k1, d1 = orb_alg.detectAndCompute(frame.img, None)
-    #k1, d1 = orb.extract(im1)
+    #k1, d1 = orb.extract(frame.img)
     t1 = time.perf_counter()
     print(f"Time to get keypts + descriptors: {t1-t0}")
     #k1 = arr_to_keypts(k1)
