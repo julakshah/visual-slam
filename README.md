@@ -26,26 +26,38 @@ Our pipeline can also be compared to the existing pipeline we built off of by ru
 ## Code Overview
 ## Algorithms
 ### FAST
-FAST is an acronym for Features from Accelerated Segment Test. First proposed in the paper ____, FAST is designed as a computational efficient keypoint finding algorithm, compared to similar keypoint detection methods. This allows for a number of real-time applications, such as SLAM, to be signifigantly more viable.
+FAST is an acronym for Features from Accelerated Segment Test. First proposed in the paper "_Machine learning for high-speed corner detection_," FAST is designed as a computationally efficient keypoint finding algorithm, compared to similar keypoint detection methods. This allows for a number of real-time applications, such as SLAM, to be significantly more viable.
 
-The core of the FAST algorithm is that the algorithm considers each pixel in an image, comparing the pixel's intensity to a circle of surrounding pixels. If enough of the surrounding pixels are either consistently more or consistently less intense, the algorithm determines the pixel to be a keypoint.
+The core of the FAST algorithm is that the algorithm considers each pixel in an image, comparing the pixel's intensity to a circle of surrounding pixels. If a sufficient number (we used 12) of consecutive pixels in the circle are all brighter than the center pixel or all darker, the algorithm determines the pixel to be a keypoint.
 
 We also implemented a couple improvements to this core logic: 
 1. Only pixels whose circles will not go past the edge of the image will be considered. This is necessary to avoid undesired behavior from points that would be attempting to access pixel data that is outside of the camera frame.
-2. Our algorithm first checks the pixels in the cardinal directions relative to the proposed keypoint pixel. This allows for pixels without __ to be quickly discarded in a fourth of the time.
+2. Our algorithm first checks the pixels in the cardinal directions relative to the proposed keypoint pixel. This allows for pixels that are not potential corners to be discarded much more quickly.
 
 ### BRIEF
-BRIEF is an acronym for Binary Robust Independent Elementary Features. First proposed in the paper "BRIEF: Binary Robust Independent Elementary Features", BRIEF takes in a list of keypoints and outputs matching bitstrngs designed to encode the features of each individual keypoint. Like FAST, BRIEF is designed to be computationally efficient, taking advantage of the low overhead required to find the hamming distance between two bit strings. allows for quick comparisons during keypoint matching.
+BRIEF is an acronym for Binary Robust Independent Elementary Features. First proposed in the paper "_BRIEF: Binary Robust Independent Elementary Features_," BRIEF takes in a list of keypoints and outputs matching bitstrings designed to encode the features of each individual keypoint. Like FAST, BRIEF is designed to be computationally efficient, taking advantage of the low overhead required to find the Hamming distance between two bitstrings, which allows for quick comparisons during keypoint matching.
 
-For each keypoint, BRIEF works by considering a circular patch of pixels around the keypoint. Next, BRIEF picks pairs of pixels and compares the intensities of two pixels, P and Q, chosen by a random disttribution. If P's intensity is greater then Q's, BRIEF adds a 1 to the keypoint's bitstring. Otherwise, a zero is added. 
+For each keypoint, BRIEF works by considering a circular patch of pixels around the keypoint. Next, BRIEF picks pairs of pixels and compares the intensities of two pixels, P and Q, chosen by a random distribution. If Q's intensity is greater than P's, BRIEF adds a 1 to the keypoint's bitstring. Otherwise, a zero is added. 
 
-By assigning a bitstring descriptor for each keypiont, the similarity between two keypoints can be quickly calculated by simply finding the hamming distance between two bitstrings with the sum of an XOR operation across the two bit strings.
+By assigning a bitstring descriptor for each keypoint, the similarity between two keypoints can be quickly calculated by simply finding the Hamming distance between two bitstrings with the sum of an XOR operation across the two bitstrings.
 
 <!--
-The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  --> -->
-
+The BRIEF algorithm starts by attempting to normalize the orientation of an image.  We can then map the keypoint's
+-->
 ### ORB
-ORB (Oriented FAST and Rotated BRIEF) is a combination of FAST and BRIEF with some slight changes. The most important is the addition of orientation correction between the FAST and BRIEF operations. Orientation correction is done by __.
+ORB (Oriented FAST and Rotated BRIEF) is a combination of FAST and BRIEF with some slight changes.
+
+The most important modification is the inclusion of orientation correction. Orientation correction is done by finding a principal orientation and rotating to align with a common orientation. To do this, we start by calculating the centroid of a keypoint patch.
+```math
+C_x = \frac{m_{10}}{m_{00}} \quad , \quad C_y = \frac{m_{01}}{m_{00}}
+```
+The centroid is made up of the moments of an image. 
+```math
+m_{00} = \sum_{x,y \in P} I(x,y), m_{10} = \sum_{x,y \in P} x \cdot I(x,y), m_{01} = \sum_{x,y \in P} y \cdot I(x,y)
+```
+Conceptually, the centroid represents the image's place of greatest intensity and the moments represent a weighted average of the image's pixel intensities across the image. Subtracting the x and y positions of the keypoint from the centroid's x and y position gives a vector from the keypoint to the centroid. The inverse tangent of this vector gives an angle, which is useful for determining a rotation matrix that can be applied to align the patch with the centroid. This process makes ORB rotation-invariant (accounts for rotation when creating the bitstring descriptors).
+
+Once the algorithm reaches BRIEF, it doesn't generate a random distribution of pairs, but uses a fixed set of values.
 
 ## Challenges and Takeaways
 
