@@ -24,6 +24,8 @@ Our Python code also requires Pangolin (OpenGL library for visualization) be bui
 
 With the dependencies installed, the main pipeline can be run with `python main.py`. This, by default, operates on the default camera stream `/dev/video0`. The source can be specified by the first command line argument after the script name: pass an int `X` to open the video device `/dev/videoX`, or pass a string to specify a relative path to an input video file. This will launch two windows, one of which displays a point cloud of recognized and triangulated keypoints together with camera frustums every frame, and the other of which consists of two adjacent frames of the video stream with a small number of keypoints matches highlighted via connecting the keypoints on each frame to each other.
 
+Note that the camera intrinsics are currently hardcoded as the matrix K, and will need to be changed for other video sources to be perfectly accurate.
+
 Additionally, passing a second, non-zero command line argument after the video source will specify that the algorithm should use OpenCV's ORB implementation, rather than our own.
 
 Our pipeline can also be compared to the existing pipeline we built off of by running `python third_party/slam.py third_party/test.mp4`. Note that the scripts within `third_party/` are not ours, and were taken from the [https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file](SLAMPy-Monocular-SLAM-implementation-in-Python) repository on GitHub, which did not include a license. Our changes to these scripts have been minimal and consisted of adding print statements for debugging purposes. Additionally, we used the `test.mp4` video file in this repository for testing purposes.
@@ -167,9 +169,13 @@ One major difficulty we ran into when developing our pipeline was the difficulty
 
 Rendering our point clouds and images proved to be consistently one of the most difficult parts of our implementation, given the different libraries and library wrappers used by the examples we found, as well as other assorted errors. Existing implementations we found used the Pangolin library for managing OpenGL display, which offers relatively easy support for rendering point clouds. However, two Python bindings for it exist, one of which could only be built with Python 3.10 or 3.9.
 
-Additionally, we decided to use the Python wrapper for SDL2 for our own implementation given its versatility. However, when integrating the different components of our code, we consistently ran into segfaults when trying to access a SDL_Surface (and later, sometimes, SDL_Texture) object. This happened independent of our own C++-style code, and backtraces with GDB pointed to the segfault occurring from a function in the `libSDL2-2.0.so.0` library. The segfault would only occur when not running in the VSCode Python debugger, which made checking for null pointers difficult, and getting a more helpful backtrace from GDB would have required building Python and SDL2 with debug symbols, which we didn't think would be the most useful application of our time. The segfault would occur non-deterministically, and seemed tied to memory or some other hardware state --- on one occasion, we recorded 25 successful times running our program, and then a segfault on the 26th and a few subsequent times after that.
+Additionally, we decided to use the Python wrapper for SDL2 for our own implementation given its versatility. However, when integrating the different components of our code, we consistently ran into segfaults when trying to access a SDL_Surface (and later, sometimes, SDL_Texture) object. This happened independent of our own C++-style code, and backtraces with GDB pointed to the segfault occurring from a function in the `libSDL2-2.0.so.0` library. The segfault would only occur when not running in the VSCode Python debugger, which made checking for null pointers difficult, and getting a more helpful backtrace from GDB would have required building Python and SDL2 with debug symbols, which we didn't think would be the most useful application of our time. The segfault would occur non-deterministically, and seemed tied to memory or some other hardware state --- on one occasion, we recorded 25 successful times running our program, and then a segfault on the 26th and a few subsequent times after that. This might be easier to debug if we were entirely in C++, but doing the project entirely in C++ would have been more effort than this change was worth.
 
-We've included some of the testing scripts we used for isolating what was causing the segfault and what wasn't in the `sdl2_test/` directory. Of these, `sdl2test.py` and `segfaults_not.py` never segfault, while `segfaults.py` does. While we tried debugging this further, the occurrence of segfaults was infrequent enough that we concluded they seem less present with SDL_Texture instead of SDL_Surface, and have left it at that.
+We tried a few things, including moving code outside of classes or functions (maybe something was going out of scope?) and doing everything in the main thread, but did not find what was causing the error.
+
+We've included some of the testing scripts we used for isolating what was causing the segfault and what wasn't in the `sdl2_test/` directory. Of these, `sdl2test.py` and `segfaults_not.py` never segfault, while `segfaults.py` does. 
+
+While we never isolated the error, we haven't observed it for some time now in our `main.py` script, and would not be surprised if it's gone. However, we did not determine what exactly was causing the get surface or get texture to fail.
 
 #### Takeaways
 
@@ -181,6 +187,8 @@ We're resolved to be more conscious of the difficulty in integrating different p
 
 We've also come to appreciate having more checks for invalid results in certain stages of the pipeline, given the time it took to catch a bug resulting in singular transform matrices. Ensuring the determinant of the transform is nonzero helps check this easily, but failing to do it led us to miss a typo in our processing of the fundamental matrix that was giving us singular matrices.
 
+The project has been beneficial for all of us with regard to learning --- after completing this project, all of us are more familiar with the steps involved with visual odometry, and Connor in particular is able to appreciate the intricacies of the ORB keypoint matching algorithms. Julian and Ben both understand the implementation of keypoint matching more, and we all have more knowledge of how to determine a camera pose from keypoint matches and then use that transform to triangulate points. Julian has become more experienced with libraries for visualizing images and point clouds as well as converting between a fundamental and essential camera matrix, and Ben has learned to integrate C++ with Python. We've also all become more confident in using Git effectively, learning both from success as well as the slight lack thereof at times.
+
 ## Future Work
 
 The logical next step for functionality of our program would include some sort of bundle adjustment for the poses and keypoints over time --- currently, we treat everything recorded in the previous frames as fixed, and do not correct them or optimize them. More sophisticated visual odometry, as well as SLAM, relies on continually optimizing the previous poses to minimize the total reprojection error (difference between predictions and observations of keypoints) across all recorded poses.
@@ -190,5 +198,17 @@ Another next step, however, would be refining our algorithm and testing to make 
 We'd also like to pull the visualization from the julian_test branch into main, compare it to the existing pipeline, and potentially catch any issues in or our existing pipeline --- ideally, they should perform very similarly, and it would be nice to have our own visualization working.
 
 ## Other notes
+
+### Contributions
+
+This project was completed by Ben Ricket, Connor Hoang, and Julian Shah.
+
+Connor implemented FAST, BRIEF, and ORB in C++ from scratch, and also set up a demo script demonstrating the performance of the from-scratch ORB compared to OpenCV's implementation. 
+
+Julian implemented keypoint matching between frames and the corresponding visuals, as well as contributing to the camera transform and keypoint triangulation code. Julian also spent time making all of the visualizations work.
+
+Ben integrated Connor's ORB implentation with Pybind11 and some helper functions to translate between Python and C++ types, and also contributed to the camera transform and keypoint triangulation code.
+
+### External Resources
 
 In addition to the included libraries, this project includes code from [https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file](SLAMPy-Monocular-SLAM-implementation-in-Python), which does not list a license. All code taken from this repository is contained within the `third_party/` directory.
