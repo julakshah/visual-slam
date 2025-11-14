@@ -92,6 +92,17 @@ class Descriptor(object):
     if self.state is None or not q.empty():
       self.state = q.get()
 
+    if self.state is None:
+        return
+    
+    poses, pts = self.state
+    if len(poses) < 1:
+      #print(f"No poses (poses is {poses})")
+      return
+    
+    #print(f"Starting refresh because state is {self.state}")
+    #print(f"shape is {self.state.shape}")
+
     gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
     gl.glClearColor(0, 0, 0, 0)
     self.dcam.Activate(self.scam)
@@ -121,10 +132,13 @@ class Descriptor(object):
     pangolin.FinishFrame()
 
   def display(self):
+    #print("\n\n\n\nDISPLAY\n\n\n\n")
     if self.q is None:
       return
     poses, pts = [], []
+    #print(f"self.frames: {self.frames}")
     for f in self.frames:
+      #print(f"Appending the pose: {f.pose}")
       poses.append(f.pose)
     for p in self.points:
       pts.append(p.pt)

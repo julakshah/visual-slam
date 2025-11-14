@@ -6,6 +6,7 @@ import numpy as np
 def triangulate(pose1, pose2, pts1, pts2):
   
   ret = np.zeros((pts1.shape[0], 4))
+  print(f"Poses: pose1 {pose1}, pose2 {pose2}")
   pose1 = np.linalg.inv(pose1)
   pose2 = np.linalg.inv(pose2)
   for i, p in enumerate(zip(pts1, pts2)):

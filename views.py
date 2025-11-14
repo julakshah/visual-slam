@@ -7,6 +7,7 @@ from skimage.transform import FundamentalMatrixTransform, EssentialMatrixTransfo
 import build.orb_project as orb
 from third_party.triangulation import triangulate # triangulate pts in space
 from third_party.cameraFrame import normalize, denormalize # used for camera intrinsics calc
+from third_party.descriptor import Descriptor, Point
 
 
 class CameraFrame(object):
@@ -63,10 +64,8 @@ class Vid:
         self.disp_q = disp_queue  # queue to send results to
         self.cap = cap  # the VideoCapture object for the sequency of images
 
-        #F = 500
-        #W, H = 1920//2, 1080//2
-        #self.K = np.array([[F,0,W//2],[0,F,H//2],[0,0,1]])
         #self.desc_dict = Descriptor() # holds global state, num frames
+        self.mapp.create_viewer()
 
     def run(self):
         while True:
@@ -78,14 +77,12 @@ class Vid:
                 continue
 
             # do feature matching
-            #good_f1, good_f2, Rt, img_with_lines = self.feature_matching(
-            #    self.mapp.frames[-2].img, self.mapp.frames[-1].img
-            #)
             good_f1, good_f2, Rt, img_with_lines = self.feature_matching(
                 self.mapp.frames[-1], self.mapp.frames[-2]
             )
 
             self.disp_q.put(img_with_lines)
+            print("Put img with lines!")
 
             # Pose update --- apply transformation to previous pose
             self.mapp.frames[-1].pose = np.dot(Rt, self.mapp.frames[-2].pose)
@@ -101,6 +98,17 @@ class Vid:
             unmatched_points = np.array([self.mapp.frames[-1].keypt_coords[i] is None for i in good_f1])
             print(f"Num unmatched pts located: {len(unmatched_points)}")
             good_pts4d = (np.abs(pts4d[:, 3]) > 0.005) & (pts4d[:, 2] > 0) & unmatched_points
+
+            # Add points to known pts to draw
+            for i,p in enumerate(pts4d):
+                #if not good_pts4d[i]:
+                #    continue
+                #print("good!")
+                pt = Point(self.mapp, p)
+                pt.add_observation(self.mapp.frames[-1], good_f1[i])
+                pt.add_observation(self.mapp.frames[-2], good_f2[i])
+
+            self.mapp.display()
 
     def feature_matching(self, frame1, frame2, filter_matches=True):
         """ Match features between two frames and return filtered keypts and transform """
@@ -149,8 +157,8 @@ class Vid:
 
             # Convert to essential matrix using intrinsic matrix
             E = self.K.T @ model.params @ self.K
-            print(f"Fundamental Matrix = {model.params}\n")
-            print(f"Essential Matrix: {E}\n\n")
+            #print(f"Fundamental Matrix = {model.params}\n")
+            #print(f"Essential Matrix: {E}\n\n")
             W = np.asmatrix([[0,-1,0],[1,0,0],[0,0,1]]) # used for conversion after svd
             U, d, Vt = np.linalg.svd(E) # do SVD on essential matrix
             if np.linalg.det(Vt) < 0:
@@ -159,7 +167,7 @@ class Vid:
             if np.sum(R.diagonal()) < 0: # ensure sum of diagonal is positive, else use other sol
                 R = np.dot(np.dot(U, W.T),Vt)
             t = U[:,2] # get translation vector from U
-            print("det(R) =", np.linalg.det(R))
+            #print("det(R) =", np.linalg.det(R))
 
             # Pose update matrix (transform between frames)
             Rt = np.eye(4)
@@ -178,95 +186,8 @@ class Vid:
                 None,
                 flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
             )
-            print(f"Transformation: {Rt}")
+            #print(f"Transformation: {Rt}")
             return good_f1[pts_rs], good_f2[pts_rs], Rt, im3
-
-    def old_feature_matching(self, im1, im2, filter_matches=True):
-        # args are InputArray image, InputArray mask
-        # output is keypoints, descriptors
-        print("About to extract keypoints and such")
-        t0 = time.perf_counter()
-        k1, d1 = self.orb.detectAndCompute(im1, None)
-        k2, d2 = self.orb.detectAndCompute(im2, None)
-        #k1, d1 = orb.extract(im1)
-        #k2, d2 = orb.extract(im2)
-        t1 = time.perf_counter()
-        print(f"Time to get keypts + descriptors: {t1-t0}")
-        #k1 = arr_to_keypts(k1)
-        #k2 = arr_to_keypts(k2)
-        t2 = time.perf_counter()
-        print(f"Time to convert incoming arr: {t2-t1}")
-
-        if d1 is None or d2 is None:
-            print("No Descriptors fourd")
-            return im1
-        
-        if not filter_matches:
-            matches = self.matcher.match(d1, d2)
-            matches = sorted(matches, key=lambda x: x.distance)
-            im3 = cv.drawMatches(
-                im1,
-                k1,
-                im2,
-                k2,
-                matches[:10],
-                None,
-                flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-            )
-            # self.disp_q.put(matches)
-            return im3
-        else:
-            # Only choose matches that are sufficiently better than the second best (Lowe's ratio)
-            matches = self.matcher.knnMatch(d1, d2, 2)
-            filter_scale = 0.95 # 1 accepts everything, 0 rejects everything
-            good_f1 = []
-            good_f2 = []
-            ret = []
-            for m1,m2 in matches:
-                if m1.distance < m2.distance * filter_scale:
-                    good_f1.append(m1.queryIdx)
-                    good_f2.append(m2.trainIdx)
-                    ret.append((k1[m1.queryIdx].pt,k2[m1.trainIdx].pt))
-            
-            print(f"Num filtered matches by Lowe's: {len(set(ret))}")
-            ret = np.array(ret)
-            good_f1 = np.array(good_f1)
-            good_f2 = np.array(good_f2)
-
-            model, pts_rs = ransac((ret[:,0], ret[:,1]),FundamentalMatrixTransform,min_samples=8,residual_threshold=0.1,max_trials=1000)
-            print(f"Num pts after RANSAC removes outliers: {len(pts_rs)}")
-
-            # Get transform from fundamental matrix
-            W = np.asmatrix([[0,-1,0],[1,0,0],[0,0,1]]) # used for conversion after svd
-            U, d, Vt = np.linalg.svd(model.params) # do SVD on fundamental matrix
-            if np.linalg.det(Vt) < 0:
-                Vt *= -1
-            R = np.dot(np.dot(U,W),Vt) # one of two solutions to rotation matrix
-            if np.sum(R.diagonal()) < 0: # ensure sum of diagonal is positive, else use other sol
-                R = np.dot(np.dot(U, W.T),Vt)
-            t = U[:,2] # get translation vector from U
-
-            # Pose update matrix (transform between frames)
-            Rt = np.eye(4)
-            Rt[:3,:3] = R
-            Rt[:3,3] = t
-
-            # Return simpler matches and pose update (consistent with earlier code for now)
-            matches_simple = self.matcher.match(d1, d2)
-            matches_simple = sorted(matches_simple, key=lambda x: x.distance)
-            im3 = cv.drawMatches(
-                im1,
-                k1,
-                im2,
-                k2,
-                matches_simple[:10],
-                None,
-                flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-            )
-            print(f"Transformation: {Rt}")
-            return good_f1[pts_rs], good_f2[pts_rs], Rt, im3
-            
-
 
 def feature_extraction(frame, orb_alg):
     """ Extract keypoints and descriptors from an image and store them in the Frame object """
@@ -303,4 +224,5 @@ class Frame:
         #print(self.keypt_coords)
         self.keypt_coords = normalize(np.linalg.inv(K),self.keypt_coords)
         #self.keypt_coords = np.array([(k.pt[0], k.pt[1]) for k in self.keypts])
+        self.pts = [None]*len(self.keypts)
         mapp.frames.append(self)  # append itself to the map

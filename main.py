@@ -12,6 +12,7 @@ import sdl2.ext
 
 # local script installs
 from views import Map, Vid, Frame
+from third_party.descriptor import Descriptor
 import camera_calib
 
 class vslam():
@@ -28,7 +29,7 @@ class vslam():
         self.H = 800
 
         # creates the map and vid views
-        self.map_win, self.vid_win = self.init_views()
+        self.vid_win = self.init_views()
         
         ### Old code for writing to window via SDL_Surface
         ### Segfaults every so often, couldn't easily diagnose
@@ -43,13 +44,13 @@ class vslam():
         #print("no segfault through get window surface (vid)")
 
         # Create renderers
-        """
-        self.map_renderer = sdl2.SDL_CreateRenderer(
-            self.map_win.window, -1,
-            sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC
-        )
-        if not self.map_renderer:
-            raise RuntimeError("failed to create map renderer: " + sdl2.SDL_GetError().decode())
+        
+        #self.map_renderer = sdl2.SDL_CreateRenderer(
+        #    self.map_win.window, -1,
+        #    sdl2.SDL_RENDERER_ACCELERATED | sdl2.SDL_RENDERER_PRESENTVSYNC
+        #)
+        #if not self.map_renderer:
+        #    raise RuntimeError("failed to create map renderer: " + sdl2.SDL_GetError().decode())
         
         self.vid_renderer = sdl2.SDL_CreateRenderer(
             self.vid_win.window, -1,
@@ -58,7 +59,7 @@ class vslam():
         if not self.vid_renderer:
             raise RuntimeError("failed to create vid renderer: " + sdl2.SDL_GetError().decode())
         print("Created renderers!")
-        """
+        
         # We'll create and destroy textures as needed if sizes change
         self.map_texture = None
         self.vid_texture = None
@@ -69,10 +70,11 @@ class vslam():
 
 
         # creates the helper objects for Map & Vid
-        self.mapp = Map()
+        # self.mapp = Map()
+        self.mapp = Descriptor()
 
-        #cap = cv.VideoCapture("third_party/test.mp4")
-        cap = cv.VideoCapture(0)
+        cap = cv.VideoCapture("third_party/test.mp4")
+        #cap = cv.VideoCapture(0)
         self.vidd = Vid(self.mapp, cap, self.vid_q)
 
         print("no segfault till thread about to start")
@@ -85,26 +87,25 @@ class vslam():
         while True:
             img = self.vid_q.get()
             print(img)
+            print("\n\nGot image!\n\n")
             # display stuff
-            #if img is not None:
-            #  self.run_viewer(img)
+            if img is not None:
+                self.run_viewer(img)
 
     def init_views(self):
         #win_flags = (sdl2.SDL_WINDOW_MINIMIZED)
-        map_win = sdl2.ext.Window("SLAM Map", (self.W, self.H))
+        #map_win = sdl2.ext.Window("SLAM Map", (self.W, self.H))
         #print("no segfault through map win")
-        map_win.show()
+        #map_win.show()
         #print("no segfault through map win show")
         vid_win = sdl2.ext.Window("SLAM Vid", (1920, 800))
         vid_win.show()
         #print("no segfault through vid win show")
         #print(f"map_win: {map_win}, vid_win: {vid_win}, map_win.window: {map_win.window}, vid_win.window: {vid_win.window}")
-        if not map_win or not map_win.window:
-            print("map_win or its window is null!")
         if not vid_win or not vid_win.window:
             print("vid_win or its window is null!")
 
-        return map_win, vid_win
+        return vid_win
     
     def _ensure_texture(self, w, h, tex):
         # Recreate texture if size changed
@@ -179,8 +180,8 @@ class vslam():
 
         # Render
         sdl2.SDL_RenderClear(self.vid_renderer)
-        sdl2.SDL_RenderCopy(self.renderer, self.texture, None, None)
-        sdl2.SDL_RenderPresent(self.renderer)
+        sdl2.SDL_RenderCopy(self.vid_renderer, self.vid_texture, None, None)
+        sdl2.SDL_RenderPresent(self.vid_renderer)
 
         #windowArray[:] = packed.swapaxes(0, 1)
         #windowArray[:] = packed.swapaxes(0,1)
