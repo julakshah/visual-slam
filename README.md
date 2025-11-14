@@ -35,9 +35,17 @@ We also implemented a couple improvements to this core logic:
 2. Our algorithm first checks the pixels in the cardinal directions relative to the proposed keypoint pixel. This allows for pixels without __ to be quickly discarded in a fourth of the time.
 
 ### BRIEF
-BRIEF is an acronym for Binary Robust Independent Elementary Features. First proposed in the paper "BRIEF: Binary Robust Independent Elementary Features", BRIEF takes in a list of keypoints and outputs matching bitstrngs designed to encode the features of each individual keypoint. Like FAST, BRIEF is designed to be computationally efficient, taking advantage of the low overhead required ot find the hamming distance between two bit strings allows for quick comparisons during keypoint matching.
+BRIEF is an acronym for Binary Robust Independent Elementary Features. First proposed in the paper "BRIEF: Binary Robust Independent Elementary Features", BRIEF takes in a list of keypoints and outputs matching bitstrngs designed to encode the features of each individual keypoint. Like FAST, BRIEF is designed to be computationally efficient, taking advantage of the low overhead required to find the hamming distance between two bit strings. allows for quick comparisons during keypoint matching.
 
-The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. The centroid is made of up the moments of an image. Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across a . These moments are calculated by 
+For each keypoint, BRIEF works by considering a circular patch of pixels around the keypoint. Next, BRIEF picks pairs of pixels and compares the intensities of two pixels, P and Q, chosen by a random disttribution. If P's intensity is greater then Q's, BRIEF adds a 1 to the keypoint's bitstring. Otherwise, a zero is added. 
+
+By assigning a bitstring descriptor for each keypiont, the similarity between two keypoints can be quickly calculated by simply finding the hamming distance between two bitstrings with the sum of an XOR operation across the two bit strings.
+
+<!--
+The BRIEF algorithm starts by attempting to normalize the orientation of an image. This is done by calculating the centroid of an image. <!--Have image of centroid equation--> The centroid is made of up the moments of an image. <!--Have image of moment equation--> Conceptually, the centroid represents ___ and the moments represent a weighted average of the images pixel intensities across the image. We can then map the keypoint's  -->
+
+### ORB
+ORB (Oriented FAST and Rotated BRIEF) is a combination of FAST and BRIEF with some slight changes. The most important is the addition of orientation correction between the FAST and BRIEF operations. Orientation correction is done by __.
 
 ## Challenges and Takeaways
 
