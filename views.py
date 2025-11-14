@@ -1,6 +1,8 @@
 import numpy as np
 import cv2 as cv
 import time
+import sys
+import math
 from skimage.measure import ransac
 from skimage.transform import FundamentalMatrixTransform
 import build.orb_project as orb
@@ -124,10 +126,17 @@ class Vid:
                 pt.add_observation(self.mapp.frames[-1], good_f1[i])
                 pt.add_observation(self.mapp.frames[-2], good_f2[i])
 
+            print(f"RMS Err List: {self.rms_err_list}")
+            rms_list_not_nan = [a for a in self.rms_err_list if not math.isnan(a)]
+            print(f"\bNum frames: {len(rms_list_not_nan)}, Avg RMS Error: {sum(rms_list_not_nan)/len(rms_list_not_nan)}\n")
             self.mapp.display()
 
     def feature_matching(self, frame1, frame2, filter_matches=True):
-        """ Match features between two frames and return filtered keypts and transform """
+        """ Match features between two frames and return filtered keypts and transform 
+        Args:
+            frame1, frame2: (Frame): Frame objects for the current and previous frames, respectively
+            filter_matches: Whether or not to use knn matching and Lowe's test
+        """
         
         k1 = frame1.keypts
         k2 = frame2.keypts
@@ -151,7 +160,7 @@ class Vid:
         else:
             # Only choose matches that are sufficiently better than the second best (Lowe's ratio)
             matches = self.matcher.knnMatch(d1, d2, 2)
-            filter_scale = 0.55 # 1 accepts everything, 0 rejects everything
+            filter_scale = 0.75 # 1 accepts everything, 0 rejects everything
             good_f1 = []
             good_f2 = []
             ret = []
@@ -247,14 +256,25 @@ def compute_reprojection_error(points_3d, points_2d_obs, Rt, K):
 
 
 def feature_extraction(frame, orb_alg):
-    """ Extract keypoints and descriptors from an image and store them in the Frame object """
+    """ Extract keypoints and descriptors from an image and store them in the Frame object 
+    Args:
+        orb_alg: Object returned by cv.ORB_create() to use for testing our ORB against cv2
+    """
+    use_default_orb = False
+    if len(sys.argv) > 2:
+        print(f"Third argument: {sys.argv[2]}")
+        use_default_orb = bool(sys.argv[2])
+
     print("About to extract keypoints and such")
     t0 = time.perf_counter()
-    #k1, d1 = orb_alg.detectAndCompute(frame.img, None)
-    k1, d1 = orb.extract(frame.img)
+    if use_default_orb:
+        k1, d1 = orb_alg.detectAndCompute(frame.img, None)
+    else: 
+        k1, d1 = orb.extract(frame.img)
     t1 = time.perf_counter()
     print(f"Time to get keypts + descriptors: {t1-t0}")
-    k1 = arr_to_keypts(k1)
+    if not use_default_orb:
+        k1 = arr_to_keypts(k1)
     t2 = time.perf_counter()
     print(f"Time to convert incoming arr: {t2-t1}")
 
@@ -264,14 +284,24 @@ def feature_extraction(frame, orb_alg):
     frame.keypts = k1
     frame.descs = d1
 
-class Map:
-    def __init__(self):
-        self.frames = []
-        self.points = []
-
-
 class Frame:
+    """
+    Class for holding data about a particular frame
+    All attributes are initialized in __init__()
+    """
     def __init__(self, mapp, img, orb_alg, K):
+        """
+        Initialize the object
+
+        Args:
+            id (int): index of the frame
+            img: image data for the frame
+            K: (3,3) numpy array holding camera intrinsics
+            pose: (4,4) numpy array holding rotation and translation of camera at this frame
+            keypts: list of cv2.KeyPoint objects holding the keypoints for this frame
+            keypt_coords: np array of (x,y) tuples of keypoint position
+            pts: list[bool] holding booleans for if points have already been drawn
+        """
         self.id = len(mapp.frames)  # give self the last id
         self.img = img
         self.K = K

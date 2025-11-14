@@ -8,13 +8,20 @@ import faulthandler
 faulthandler.enable()
 import sdl2
 import sdl2.ext
+import sys
 
 # local script installs
-from views import Map, Vid, Frame
+from views import Vid, Frame
 from third_party.descriptor import Descriptor
 
 class vslam():
-    def __init__(self):
+    def __init__(self,path):
+        """
+        Main class to run visual odometry 
+        Args:
+            path: argument to pass as input to cv.VideoCapture
+                0 for computer webcam, "path/to/file" for a video file
+        """
         # start sdl2 so that you can do stuff
         sdl2.ext.init()
         print("no segfault through sdl init")
@@ -70,7 +77,7 @@ class vslam():
         # self.mapp = Map()
         self.mapp = Descriptor()
 
-        cap = cv.VideoCapture("third_party/test.mp4")
+        cap = cv.VideoCapture(path)
         #cap = cv.VideoCapture(0)
         self.vidd = Vid(self.mapp, cap, self.vid_q)
 
@@ -204,7 +211,14 @@ class vslam():
 
 
 if __name__ == "__main__":
-    obj = vslam()
+    if len(sys.argv) == 1:
+        path = 0
+    if len(sys.argv) > 1:
+        if sys.argv[1].isdigit(): # cast to int in case we want a video device
+            path = int(sys.argv[1])
+        else:
+            path = sys.argv[1]
+    obj = vslam(path)
 
 
 

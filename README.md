@@ -1,8 +1,8 @@
 # Visual Odometry
 
-The goal of this project is to implement visual odometry with a monocular camera. By identifying keypoints, tracking them across multiple frames, and using that information to determine the camera's motion.
+The goal of this project is to implement visual odometry with a monocular camera. By identifying keypoints, tracking them across multiple frames, and using that information to estimate a transform between camera poses, we can determine a camera's motion.
 
-To do this, we started by utilizing existing codebases to create a full pipeline that executed visual odometry. We proceeded to implement custom FAST and BRIEF code for keypoint identification and feature extraction respectively.
+To do this, we started by utilizing existing codebases to create a full pipeline that executed visual odometry. We proceeded to implement custom FAST and BRIEF code for keypoint identification and feature extraction respectively, as well as writing our the higher-level steps of visual odometry.
 
 ## Using the Code
 
@@ -22,13 +22,19 @@ The C++ code can be tested by running the executable `./build/orb_demo`. If all 
 
 Our Python code also requires Pangolin (OpenGL library for visualization) be built and its Python bindings installed, which can be done following the instructions at https://github.com/uoip/pangolin. Other Python dependencies can be installed via the `requirements.txt` file with `pip install -r requirements.txt`.
 
-With the dependencies installed, the main pipeline can be run with `python main.py`. This, by default, operates on the test mp4 file at `third_part/test.mp4`, though the video source can be changed by passing in a different filepath to the cv.VideoCapture() constructor, or by passing an int `X` to signify the camera stream at `/dev/videoX`. This will launch two windows, one of which displays a point cloud of recognized and triangulated keypoints together with camera frustums every frame, and the other of which consists of two adjacent frames of the video stream with a small number of keypoints matches highlighted via connecting the keypoints on each frame to each other.
+With the dependencies installed, the main pipeline can be run with `python main.py`. This, by default, operates on the default camera stream `/dev/video0`. The source can be specified by the first command line argument after the script name: pass an int `X` to open the video device `/dev/videoX`, or pass a string to specify a relative path to an input video file. This will launch two windows, one of which displays a point cloud of recognized and triangulated keypoints together with camera frustums every frame, and the other of which consists of two adjacent frames of the video stream with a small number of keypoints matches highlighted via connecting the keypoints on each frame to each other.
 
-Our pipeline can also be compared to the existing pipeline we built off of by running `python third_party/slam.py third_party/test.mp4`. Note that the scripts within `third_party/` are not ours, and were taken from the [https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file](SLAMPy-Monocular-SLAM-implementation-in-Python) repository on GitHub, which did not include a license. Our changes to these scripts have been minimal and consisted of adding print statements for debugging purposes.
+Additionally, passing a second, non-zero command line argument after the video source will specify that the algorithm should use OpenCV's ORB implementation, rather than our own.
+
+Our pipeline can also be compared to the existing pipeline we built off of by running `python third_party/slam.py third_party/test.mp4`. Note that the scripts within `third_party/` are not ours, and were taken from the [https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file](SLAMPy-Monocular-SLAM-implementation-in-Python) repository on GitHub, which did not include a license. Our changes to these scripts have been minimal and consisted of adding print statements for debugging purposes. Additionally, we used the `test.mp4` video file in this repository for testing purposes.
 
 ## Code Overview
 
 In this project, we implement visual odometry. As a high-level overview, visual odometry aims to use subsequent image frames from a camera to estimate how the camera has moved in space between frames, allowing the trajectory of the camera to be estimated. Along with this, a 3D point cloud of recognized keypoints can be assembled by projecting points from each camera frame into the world frame.
+
+<p align="center">
+  <img src="./images/vis_odom.gif" alt="Visual Odometry" width="1000"/>
+</p>
 
 Our own learning goals included understanding the primary components of visual odometry from the ground up; for this reason, we chose to specifically implement certain key parts of the algorithm ourselves, rather than rely on functions already provided by OpenCV that do the same for us.
 
@@ -41,10 +47,6 @@ The structure of our code is as follows:
 - Visualize our point cloud of keypoints by drawing them in space together with the camera poses.
 
 We don't do any sort of map optimization after the fact, as would occur in any full SLAM implementation --- instead, keypoints drawn in the previous frame are constant, as is the previous pose.
-
-=======
-
-> > > > > > > Stashed changes
 
 ## Algorithms
 
@@ -65,7 +67,11 @@ BRIEF is an acronym for Binary Robust Independent Elementary Features. First pro
 
 For each keypoint, BRIEF works by considering a circular patch of pixels around the keypoint. Next, BRIEF picks pairs of pixels and compares the intensities of two pixels, P and Q, chosen by a random distribution. If Q's intensity is greater than P's, BRIEF adds a 1 to the keypoint's bitstring. Otherwise, a zero is added.
 
-By assigning a bitstring descriptor for each keypoint, the similarity between two keypoints can be quickly calculated by simply finding the Hamming distance between two bitstrings with the sum of an XOR operation across the two bitstrings.
+By assigning a bitstring descriptor for each keypoint, the similarity between two keypoints can be quickly calculated by simply finding the Hamming distance between two bitstrings with the sum of an XOR operation across the two bitstrings. Below, we've attached a demo of our BRIEF descriptor in action --- the lines represent a subset of the feature matches performed, matching a keypoint on one frame with a keypoint on the next.
+
+<p align="center">
+  <img src="./images/keypt_matching.gif" alt="BRIEF mapping" width="1000"/>
+</p>
 
 <!--
 The BRIEF algorithm starts by attempting to normalize the orientation of an image.  We can then map the keypoint's
@@ -120,7 +126,7 @@ x \times P_2X = 0
 This form is great since it maps the same point in both frames. Now we need to find a form we can actually solve it in using SVD. Define $u_1$ and $v_1$ as the 2d coordinates of a point in camera frame 1, and $u_2$ and $v_2$ as the 2d coordinates of **the same point** in camera frame 2. Then we can use some linear algebra properties to expand our equation into:
 
 <p align="center">
-  <img src="./images/Triangulation_eqn.png" alt="First Broken Map" width="600"/>
+  <img src="./images/Triangulation_eqn.png" alt="Triangulation eqn" width="600"/>
 </p>
 
 Using SVD, we can now solve for $x = [X, Y, Z, 1]^T$ for every point between the frames. These 3D coordinates directly correspond to the map we are seeking to create via this algorithm.
@@ -133,7 +139,9 @@ In implementing certain parts of the visual odometry pipeline, we ran into a num
 
 #### Performance
 
-As of now, our code does not function well when measured against the third-party implementation as a benchmark. We added a helper function computing the reprojection error for a single frame, and measured the third-party implementation to have a root mean square error of slightly over 0.1. We measured our code to have a RMS reprojection error anywhere between 1 and sometimes 50 or near 100, indicating notably worse performance of our code. This occurs even with the default keypoint identification from OpenCV, indicating a problem with our matching, pose estimation, or triangulation pipeline. This error is also visually apparent --- for a video in which the camera moves forwards, the poses graphed face notably sideways relative to the direction of motion, indicating the transform is off for some reason.
+As of now, our code does not function particularly well when measured against the third-party implementation as a benchmark. We added a helper function computing the reprojection error for a single frame, and measured the third-party implementation to have a root mean square error of slightly over 0.1. We measured our code to have a RMS reprojection error that averaged 1.75 over 45 frames, roughly an order of magnitude higher than the third-party implementation, when using our own matching, pose estimate, and triangulation yet OpenCV's ORB. Using our own ORB implementation on top of this, we get significantly worse values --- at some frames, we have RMS error of about 5 or 10, while a few significantly bad matches lead to extremely high error, driving the average up to over 100 at points. Further work could include throwing out pose updates with sufficiently bad reprojection error and keeping the better ones, but the presence of these outliers alone demonstrates the issues with the from-scratch ORB implementation.
+
+From this, we conclude that our pipeline, excepting ORB, may not be significantly wrong --- the error is notably greater, but we also refrain from doing the optimization with g2o that the third party pipeline uses, possibly explaining our difference. Slight errors in the pipeline may also contribute to the reprojection error being greater, but the visual progression of the camera pose appears fairly accurate --- in the test video of a car driving down the road, the pose frustums appear to follow the path fairly accurately, and when looking at a static wall via the computer webcam, the camera poses drift slowly but mostly at random. However, the determination of keypoints in poorly-defined environments also ends up difficult, with there being some cases where too few points are passed into RANSAC, which determines the fundamental matrix. Adjusting the tolerance when matching as a function of the number of keypoints or extent of matching would be helpful in this case, but wasn't implemented in the interest of time.
 
 #### ORB
 
@@ -144,6 +152,8 @@ Trying figure out why so many descriptors were zero, we realized we made another
 One minor challenge was integrating the ORB implementation, written in C++, to the rest of our project in Python. As we hadn't recognized a benefit in using ROS2 or any other middleware that abstracts the C++-to-Python communcation, we ended up learning the basics of Pybind11 for building a Python interface into a C++ function, which is useful to know.
 
 #### Display
+
+One major difficulty we ran into when developing our pipeline was the difficulty in writing our own code to display the point cloud, coupled with our difficulty in integrating our different pipelines together after visualization worked. The images below were from the alternate visualization, pose update, and triangulation pipeline present on the julian_test branch. While we did get the visualization to successfully display a point cloud, our mapping between keypoint matches and triangulated points was wrong at some phase, leading to these pretty but uninformative point clouds that did not accurately depict the test video. With more time, we would have integrated this visualization scheme with our main pipeline, as it has the most promising values for the camera pose update and triangulated point locations. However, we did not have the time to pull this visualization into our main branch.
 
 <p align="center">
   <img src="./images/broken1.png" alt="First Broken Map" width="300"/>
@@ -167,6 +177,8 @@ Our primary takeaway from this project is to not commit ourselves too heavily to
 
 In the future, we plan to be less wedded to the initial libraries and pieces of code we find, knowing that when these pieces of code give us trouble that seems unrelated to our own project work, we can probably find another implementation or library that would let us more quickly return to the actual content of the project.
 
+We're resolved to be more conscious of the difficulty in integrating different parts of the code together in the future --- while we initially sought to follow good practice with feature branches and pulling into main after testing, we ended up spending almost all of our time working in separate branches, only integrating the different features near the end of the project. While the C++ code was relatively easy to integrate after writing a few wrapper functions for converting between Numpy and C++ types, we ended up with two main visual odometry pipelines in two different branches, and only had the time to integrate one of them into our main branch. To avoid this in the future, we plan on being more clear about deadlines along the course of the project, as well as what components we're each expecting each other to write. In our case, too much code for the main pipeline was developed in both branches and never integrated, leading to us having valuable code not pulled into our main branch and fully working.
+
 We've also come to appreciate having more checks for invalid results in certain stages of the pipeline, given the time it took to catch a bug resulting in singular transform matrices. Ensuring the determinant of the transform is nonzero helps check this easily, but failing to do it led us to miss a typo in our processing of the fundamental matrix that was giving us singular matrices.
 
 ## Future Work
@@ -174,6 +186,8 @@ We've also come to appreciate having more checks for invalid results in certain 
 The logical next step for functionality of our program would include some sort of bundle adjustment for the poses and keypoints over time --- currently, we treat everything recorded in the previous frames as fixed, and do not correct them or optimize them. More sophisticated visual odometry, as well as SLAM, relies on continually optimizing the previous poses to minimize the total reprojection error (difference between predictions and observations of keypoints) across all recorded poses.
 
 Another next step, however, would be refining our algorithm and testing to make sure it functions to an extent --- we're still not satisfied with the performance we have, both in terms of reprojection error as well as speed. Correcting our algorithm until we obtain a similar reprojection error to the third-party implementation is therefore a higher priority, as would be seeing what changes could be made to the C++ code to improve its speed --- we figure that OpenCV likely uses every optimization available to run quickly, but there are still likely approachable changes that we could make to our code to improve its speed.
+
+We'd also like to pull the visualization from the julian_test branch into main, compare it to the existing pipeline, and potentially catch any issues in or our existing pipeline --- ideally, they should perform very similarly, and it would be nice to have our own visualization working.
 
 ## Other notes
 
