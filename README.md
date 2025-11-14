@@ -24,6 +24,20 @@ With the dependencies installed, the main pipeline can be run with `python main.
 Our pipeline can also be compared to the existing pipeline we built off of by running `python third_party/slam.py third_party/test.mp4`. Note that the scripts within `third_party/` are not ours, and were taken from the [https://github.com/Akbonline/SLAMPy-Monocular-SLAM-implementation-in-Python?tab=readme-ov-file](SLAMPy-Monocular-SLAM-implementation-in-Python) repository on GitHub, which did not include a license. Our changes to these scripts have been minimal and consisted of adding print statements for debugging purposes.
 
 ## Code Overview
+
+In this project, we implement visual odometry. As a high-level overview, visual odometry aims to use subsequent image frames from a camera to estimate how the camera has moved in space between frames, allowing the trajectory of the camera to be estimated. Along with this, a 3D point cloud of recognized keypoints can be assembled by projecting points from each camera frame into the world frame. 
+
+Our own learning goals included understanding the primary components of visual odometry from the ground up; for this reason, we chose to specifically implement certain key parts of the algorithm ourselves, rather than rely on functions already provided by OpenCV that do the same for us. 
+
+The structure of our code is as follows:
+- Extract keypoints and descriptors from an image frame. Keypoints are visually identifiable elements of the image (typically corners, for instance) that can be tracked between frames, while descriptors are objects that attempt to uniquely describe a keypoint such that comparison of descriptors can serve as a metric for distinguishing which keypoints between frames are actually the same keypoint in space. For our implementation, we use FAST to extract keypoints and BRIEF to generate descriptors, implement both of these algorithms from scratch in C++, and access it from our Python code via Pybind11. 
+- Match keypoints between frames by their descriptors. The BRIEF descriptor is composed of binary comparisons, and can thus be quickly compared to another BRIEF descriptor via summing a bitstring after an XOR operation, which gets the Hamming distance (number of different bits) to use as an error metric. We obtain the two best matches and filter out points that don't clearly have a best match (i.e. the second best match is almost as good.)
+- Compute the camera pose update. We first can compute a fundamental matrix describing the mapping between keypoints between frames, account for the camera intrinsic parameters (focal lengths and image centers) to get the essential matrix, and construct a 4x4 transformation matrix via SVD and some other manipulation of the essential matrix. The resulting transform consists of a 3x3 rotation matrix and 3x1 translation vector, concatentated into a 4x4 matrix. 
+- Triangulate the keypoints in space given the current camera pose (camera pose is our transformation matrix times the previous camera pose). If the keypoint is the same as one we recorded for the previous frame, ignore it for drawing --- we don't want to draw it again.
+- Visualize our point cloud of keypoints by drawing them in space together with the camera poses. 
+
+We don't do any sort of map optimization after the fact, as would occur in any full SLAM implementation --- instead, keypoints drawn in the previous frame are constant, as is the previous pose. 
+
 ## Algorithms
 ### FAST
 FAST is an acronym for Features from Accelerated Segment Test. First proposed in the paper ____, FAST is designed as a computational efficient keypoint finding algorithm, compared to similar keypoint detection methods. This allows for a number of real-time applications, such as SLAM, to be signifigantly more viable.
